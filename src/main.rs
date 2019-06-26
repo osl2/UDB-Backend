@@ -18,9 +18,10 @@ fn main() {
     let sys = actix::System::new("udb-backend");
     let prometheus = actix_web_prom::PrometheusMetrics::new("api", "/metrics");
     
+    let config_for_server = configuration.clone();
     HttpServer::new(move || {
         App::new()
-            .data(configuration.clone())
+            .data(config_for_server.clone())
             .wrap(actix_web::middleware::Logger::default())
             .wrap(prometheus.clone())
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
@@ -28,7 +29,7 @@ fn main() {
                 web::scope("/api/v1")
             )
     })
-    .bind("[::]:8085")
+    .bind(configuration.listen_addr)
     .unwrap()
     .start();
 

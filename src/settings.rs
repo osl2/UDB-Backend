@@ -3,6 +3,11 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
+    pub(crate) open_registration: Option<bool>,
+    pub(crate) jwt_key: String,
+    pub(crate) http_timeout: Option<u64>,
+    pub(crate) listen_addr: std::net::SocketAddr,
+    pub(crate) trusted_proxies: Option<Vec<std::net::IpAddr>>,
 }
 
 impl Settings {
