@@ -19,7 +19,7 @@ fn main() {
     let prometheus = actix_web_prom::PrometheusMetrics::new("api", "/metrics");
     
     let config_for_server = configuration.clone();
-    HttpServer::new(move || {
+    let mut server = HttpServer::new(move || {
         App::new()
             .data(config_for_server.clone())
             .wrap(actix_web::middleware::Logger::default())
@@ -28,10 +28,17 @@ fn main() {
             .service(
                 web::scope("/api/v1")
             )
-    })
-    .bind(configuration.listen_addr)
-    .unwrap()
-    .start();
+    });
+    for addr in configuration.listen_addr {
+        server = match server.bind(addr) {
+            Ok(server) => server,
+            Err(e) => {
+                error!("Couldn't bind to {} because of {}", addr, e);
+                return;
+            }
+        };
+    }
+    server.start();
 
     match sys.run() {
         Ok(_) => (),
