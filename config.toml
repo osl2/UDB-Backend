@@ -2,4 +2,4 @@ open_registration = true
 jwt_key = ""
 http_timeout = 15000
 listen_addr = ["[::]:8080"]
-db_uri = "app.db"
+db_connection = { type = "sqlite", file = "app.db" }

@@ -1,4 +1,5 @@
 use config::{ConfigError, Config, File, Environment};
+use crate::database::DatabaseConnectionConfig;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -8,7 +9,7 @@ pub struct Settings {
     pub(crate) http_timeout: Option<u64>,
     pub(crate) listen_addr: Vec<std::net::SocketAddr>,
     pub(crate) trusted_proxies: Option<Vec<std::net::IpAddr>>,
-    pub(crate) db_uri: String,
+    pub(crate) db_connection: DatabaseConnectionConfig,
 }
 
 impl Settings {

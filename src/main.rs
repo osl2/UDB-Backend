@@ -4,6 +4,7 @@ use log::error;
 mod settings;
 mod cli;
 mod logging;
+mod database;
 
 fn main() {
     let cli_matches = cli::setup_cli();
