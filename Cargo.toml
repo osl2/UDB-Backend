@@ -6,7 +6,6 @@ edition = "2018"
 
 [dependencies]
 actix-web = "1.0.2"
-diesel = "1.4.2"
 serde = { version = "1.0.92", features = ["derive"] }
 clap = "2.33.0"
 fern = "0.5.8"
@@ -16,3 +15,4 @@ config = "0.9.3"
 jsonwebtoken = "6.0.1"
 chrono = "0.4.6"
 actix = "0.8.3"
+diesel = { version = "1.4.2", features = ["sqlite", "postgres"] }
