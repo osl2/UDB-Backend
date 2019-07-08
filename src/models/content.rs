@@ -16,9 +16,9 @@ use serde_json::Value;
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Content {
     #[serde(rename = "sql")]
-    SQL(::models::SqlContent),
+    SQL { row_order_matters: bool },
     #[serde(rename = "multiple_choice")]
-    MC(::models::McContent),
+    MC { answer_options: Vec<String> },
     Plaintext,
     Instruction,
 }

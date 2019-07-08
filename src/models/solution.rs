@@ -16,11 +16,11 @@ use serde_json::Value;
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Solution {
     #[serde(rename = "sql")]
-    SQL(::models::SqlSolution),
+    SQL { columns: Vec<String>, rows: Vec<Vec<String>>, query: String },
     #[serde(rename = "multiple_choice")]
-    MC(::models::McSolution),
+    MultipleChoice { positions: Vec<i64> },
     #[serde(rename = "plaintext")]
-    Plaintext(::models::PlaintextSolution),
+    Plaintext { text: String },
     Instruction,
 }
 
