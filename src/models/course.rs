@@ -10,9 +10,7 @@
 
 /// Course : The root of the Course type's schema.
 
-#[allow(unused_imports)]
-use serde_json::Value;
-
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Course {
@@ -24,18 +22,6 @@ pub struct Course {
     pub worksheets: Vec<String>,
     #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-}
-
-impl Course {
-    /// The root of the Course type's schema.
-    pub fn new(id: String, name: String, worksheets: Vec<String>) -> Course {
-        Course {
-            id: id,
-            name: name,
-            worksheets: worksheets,
-            description: None,
-        }
-    }
 }
 
 

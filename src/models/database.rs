@@ -10,9 +10,7 @@
 
 /// Database : The root of the Database type's schema.
 
-#[allow(unused_imports)]
-use serde_json::Value;
-
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Database {
@@ -21,15 +19,3 @@ pub struct Database {
     #[serde(rename = "id")]
     pub id: String,
 }
-
-impl Database {
-    /// The root of the Database type's schema.
-    pub fn new(database: String, id: String) -> Database {
-        Database {
-            database: database,
-            id: id,
-        }
-    }
-}
-
-
