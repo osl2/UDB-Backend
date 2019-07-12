@@ -6,7 +6,7 @@ stages:
 
 cargo-test:
   stage: test
-  image: rust:latest
+  image: :latest
   before_script:
     - apt-get update -yqq
     - apt-get install -yqq --no-install-recommends build-essential libsqlite3-dev libpq-dev default-libmysqlclient-dev
@@ -16,10 +16,6 @@ cargo-test:
     - cargo check
     - cargo clippy
     - cargo test --all --verbose
-    - cargo build --release
-  artifacts:
-    paths:
-      - target/release/udb-back
 
 docker-build-master:
   # Official docker image.
