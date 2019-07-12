@@ -9,7 +9,7 @@ cargo-test:
   image: rust:latest
   before_script:
     - apt-get update -yqq
-    - apt-get install -yqq --no-install-recommends build-essential libsqlite3-dev libpq-dev libmysqlclient-dev
+    - apt-get install -yqq --no-install-recommends build-essential libsqlite3-dev libpq-dev default-libmysqlclient-dev
   script:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo check
