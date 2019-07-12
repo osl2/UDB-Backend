@@ -6,7 +6,7 @@ stages:
 
 cargo-test:
   stage: test
-  image: :latest
+  image: rust:latest
   before_script:
     - apt-get update -yqq
     - apt-get install -yqq --no-install-recommends build-essential libsqlite3-dev libpq-dev default-libmysqlclient-dev
