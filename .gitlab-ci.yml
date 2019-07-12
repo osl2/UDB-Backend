@@ -1,5 +1,11 @@
 image: alpine
+
+stages:
+  - test
+  - build
+
 cargo-test:
+  stage: test
   image: rust:latest
   before_script:
     - apt-get update -yqq
