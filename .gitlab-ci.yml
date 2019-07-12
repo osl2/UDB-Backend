@@ -2,7 +2,7 @@ image: alpine
 
 stages:
   - test
-#  - build
+  - build
 
 cargo-test:
   stage: test
