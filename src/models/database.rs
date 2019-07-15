@@ -11,11 +11,15 @@
 /// Database : The root of the Database type's schema.
 
 use serde::{Serialize, Deserialize};
+use diesel::{Queryable, Insertable};
+use crate::schema::databases;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Clone)]
 pub struct Database {
-    #[serde(rename = "database")]
-    pub database: String,
     #[serde(rename = "id")]
     pub id: String,
+    #[serde(rename = "name")]
+    pub name: String,
+    #[serde(rename = "database")]
+    pub content: String,
 }

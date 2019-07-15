@@ -3,10 +3,30 @@ use uuid::Uuid;
 use actix_web::{
     get, put, post, delete, web, Error, HttpRequest, HttpResponse
 };
+use crate::AppData;
+use crate::schema;
+use crate::models;
+use diesel::prelude::*;
+use log::debug;
 
 #[get("/databases")]
-fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
+pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+    let appdata: &AppData = req.app_data().unwrap();
+    let conn = match appdata.get_db_connection(){
+        Ok(connection) => connection,
+        Err(_) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        },
+    };
+    let query = schema::databases::table.load::<models::Database>(&*conn);
+    match query {
+        Ok(result) => {
+            Box::new(Ok(HttpResponse::Ok().json(result)).into_future())
+        },
+        Err(e) => {
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
+    }
 }
 #[post("/databases")]
 fn create_database(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
