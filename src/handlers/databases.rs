@@ -33,10 +33,12 @@ pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error 
         }
     }
 }
+
 #[post("/databases")]
 pub fn create_database(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
+
 #[get("/databases/{id}")]
 pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
@@ -62,10 +64,12 @@ pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = 
         }
     }
 }
+
 #[put("/databases/{id}")]
 pub fn update_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
+
 #[delete("/databases/{id}")]
 pub fn delete_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())

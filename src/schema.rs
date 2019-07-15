@@ -26,7 +26,7 @@ table! {
         id -> Text,
         instruction -> Nullable<Text>,
         is_solution_verifiable -> Nullable<Bool>,
-        content -> Nullable<Binary>,
+        content -> Nullable<Text>,
         task_id -> Nullable<Text>,
     }
 }
