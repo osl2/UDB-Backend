@@ -7,8 +7,6 @@ use crate::AppData;
 use crate::schema;
 use crate::models;
 use diesel::prelude::*;
-use log::debug;
-use crate::models::Database;
 
 #[get("/databases")]
 pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
@@ -50,7 +48,7 @@ pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = 
         },
     };
 
-    let query = schema::databases::table.find(format!("{}", id)).get_result::<Database>(&*conn);
+    let query = schema::databases::table.find(format!("{}", id)).get_result::<models::Database>(&*conn);
 
     match query {
         Ok(result) => {
