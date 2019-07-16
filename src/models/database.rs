@@ -13,11 +13,30 @@
 use serde::{Serialize, Deserialize};
 use diesel::{Queryable, Insertable};
 use crate::schema::databases;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Clone)]
 pub struct Database {
     #[serde(rename = "id")]
     pub id: String,
+    #[serde(rename = "name")]
+    pub name: String,
+    #[serde(rename = "database")]
+    pub content: String,
+}
+
+impl Database {
+    pub fn from_new_database(database: NewDatabase, uuid: Uuid) -> Self {
+        Self {
+            id: uuid.to_string(),
+            name: database.name,
+            content: database.content,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NewDatabase {
     #[serde(rename = "name")]
     pub name: String,
     #[serde(rename = "database")]

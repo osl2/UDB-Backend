@@ -35,8 +35,28 @@ pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error 
 }
 
 #[post("/databases")]
-pub fn create_database(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
+pub fn create_database(req: HttpRequest, json: web::Json<models::NewDatabase>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+    let appdata: &AppData = req.app_data().unwrap();
+
+    let conn = match appdata.get_db_connection(){
+        Ok(connection) => connection,
+        Err(_) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        },
+    };
+
+    let new_database = json.into_inner();
+    let id = Uuid::new_v4();
+    let database = models::Database::from_new_database(new_database, id);
+
+    match diesel::insert_into(schema::databases::table).values(database).execute(&*conn) {
+        Ok(result) => {
+            Box::new(Ok(HttpResponse::Ok().json(id)).into_future())
+        }
+        Err(e) => {
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
+    }
 }
 
 #[get("/databases/{id}")]
