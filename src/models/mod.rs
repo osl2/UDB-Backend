@@ -7,7 +7,7 @@ pub use self::content::Content;
 mod course;
 pub use self::course::Course;
 mod database;
-pub use self::database::{Database, NewDatabase};
+pub use self::database::Database;
 mod solution;
 pub use self::solution::Solution;
 mod subtask;

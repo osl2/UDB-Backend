@@ -35,7 +35,7 @@ pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error 
 }
 
 #[post("/databases")]
-pub fn create_database(req: HttpRequest, json: web::Json<models::NewDatabase>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+pub fn create_database(req: HttpRequest, json: web::Json<models::Database>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -45,9 +45,9 @@ pub fn create_database(req: HttpRequest, json: web::Json<models::NewDatabase>) -
         },
     };
 
-    let new_database = json.into_inner();
+    let mut new_database = json.into_inner();
     let id = Uuid::new_v4();
-    let database = models::Database::from_new_database(new_database, id);
+    new_database.id = id.to_string();
 
     match diesel::insert_into(schema::databases::table).values(database).execute(&*conn) {
         Ok(result) => {
@@ -86,11 +86,21 @@ pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = 
 }
 
 #[put("/databases/{id}")]
-pub fn update_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+pub fn update_database(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Database>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 
 #[delete("/databases/{id}")]
 pub fn delete_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+    let appdata: &AppData = req.app_data().unwrap();
+
+    let conn = match appdata.get_db_connection(){
+        Ok(connection) => connection,
+        Err(_) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        },
+    };
+
+    diesel::delete(schema::databases.filter(schema::databases::id.eq(id.to_string()))).execute(&*conn);
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
