@@ -14,7 +14,7 @@ use serde::{Serialize, Deserialize};
 use diesel::{Queryable, Insertable};
 use crate::schema::databases;
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Clone)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Clone, AsChangeset)]
 pub struct Database {
     #[serde(rename = "id")]
     pub id: String,
