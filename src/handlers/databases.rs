@@ -17,8 +17,6 @@ pub fn get_scope() -> Scope {
     .service(delete_database)
 }
 
-const CURRENT_USER: &str = "549b60cd-9b88-467b-9b1e-b15c68114c96";  // TODO: user authentication
-
 #[get("")]
 pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
@@ -31,7 +29,7 @@ pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error 
     };
 
     let query = schema::databases::table.inner_join(schema::access::table.on(schema::databases::columns::id.eq(schema::access::columns::object_id)))
-        .filter(schema::access::columns::user_id.eq(CURRENT_USER))
+        .filter(schema::access::columns::user_id.eq(appdata.current_user.to_string()))
         .select((schema::databases::columns::id, schema::databases::columns::name, schema::databases::columns::content))
         .load::<models::Database>(&*conn);
 
@@ -63,7 +61,7 @@ pub fn create_database(req: HttpRequest, json: web::Json<models::Database>) -> B
 
     // insert access for user
     match diesel::insert_into(schema::access::table)
-        .values(models::Access{ user_id: CURRENT_USER.to_string(), object_id: id.to_string() })
+        .values(models::Access{ user_id: appdata.current_user.to_string(), object_id: id.to_string() })
         .execute(&*conn) {
         Ok(result) => {}
         Err(e) => {

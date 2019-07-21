@@ -5,6 +5,7 @@ use actix_web::{web, App, HttpServer};
 use log::error;
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::SqliteConnection;
+use uuid::Uuid;
 
 mod settings;
 mod cli;
@@ -18,6 +19,7 @@ mod schema;
 struct AppData {
     settings: settings::Settings,
     db_connection_pool: Option<r2d2::Pool<ConnectionManager<SqliteConnection>>>,
+    current_user: Uuid,
 }
 
 impl AppData {
@@ -26,6 +28,7 @@ impl AppData {
         Self {
             settings: config,
             db_connection_pool: pool,
+            current_user:  Uuid::parse_str("549b60cd-9b88-467b-9b1e-b15c68114c96").unwrap(),  // test user
         }
     }
 
@@ -60,6 +63,8 @@ fn main() {
         App::new()
             .data(appstate.clone())
             .wrap(actix_web::middleware::Logger::default())
+            .wrap(actix_web::middleware::DefaultHeaders::new()
+                .header("Access-Control-Allow-Origin", "*"))  // CORS allow all for now
             .wrap(prometheus.clone())
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(

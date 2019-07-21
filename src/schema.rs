@@ -24,8 +24,9 @@ table! {
 table! {
     subtasks (id) {
         id -> Text,
-        instruction -> Nullable<Text>,
-        is_solution_verifiable -> Nullable<Bool>,
+        instruction -> Text,
+        is_solution_verifiable -> Bool,
+        is_solution_visible -> Bool,
         content -> Nullable<Text>,
         task_id -> Nullable<Text>,
     }
@@ -34,6 +35,8 @@ table! {
 table! {
     tasks (id) {
         id -> Text,
+        name -> Text,
+        database_id -> Nullable<Text>,
         worksheet_id -> Nullable<Text>,
     }
 }
@@ -58,6 +61,7 @@ table! {
 }
 
 joinable!(subtasks -> tasks (task_id));
+joinable!(tasks -> databases (database_id));
 joinable!(tasks -> worksheets (worksheet_id));
 joinable!(worksheets -> courses (course_id));
 

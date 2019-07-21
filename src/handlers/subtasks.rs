@@ -3,8 +3,10 @@ use uuid::Uuid;
 use actix_web::{
     get, put, post, delete, web, Error, HttpRequest, HttpResponse, Scope
 };
-
-use log::debug;
+use diesel::prelude::*;
+use crate::AppData;
+use crate::schema;
+use crate::models;
 
 pub fn get_scope() -> Scope {
     web::scope("/{task_id}/subtasks")
@@ -25,9 +27,28 @@ fn create_subtask(req: HttpRequest, task_id: web::Path<Uuid>) -> Box<Future<Item
 }
 #[get("/{subtask_id}")]
 fn get_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    debug!("Received request: {:?}", req);
-    debug!("Has task ID {} and subtask ID {}", ids.0, ids.1);
-    Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
+    let appdata: &AppData = req.app_data().unwrap();
+
+    let conn = match appdata.get_db_connection(){
+        Ok(connection) => connection,
+        Err(_) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        },
+    };
+
+    let query = schema::subtasks::table.find(format!("{}", ids.1)).get_result::<models::DBSubtask>(&*conn);
+
+    match query {
+        Ok(result) => {
+            Box::new(Ok(HttpResponse::Ok().json(models::Subtask::from_db_subtask(result)).into_future()))
+        },
+        Err(e) => {
+            match e {
+                diesel::result::Error::NotFound => Box::new(Ok(HttpResponse::NotFound().finish()).into_future()),
+                _ => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
+            }
+        }
+    }
 }
 #[put("/{subtask_id}")]
 fn update_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<Future<Item = HttpResponse, Error = Error>> {
