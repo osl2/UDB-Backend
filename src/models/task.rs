@@ -9,15 +9,23 @@
  */
 
 use serde::{Serialize, Deserialize};
+use crate::schema::tasks;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Task {
     #[serde(rename = "id", skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    #[serde(rename = "name", skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
     #[serde(rename = "database")]
     pub database: String,
     #[serde(rename = "subtasks", skip_serializing_if = "Option::is_none")]
     pub subtasks: Option<Vec<String>>,
+}
+
+#[derive(Debug, Insertable, Queryable, Identifiable)]
+#[table_name = "tasks"]
+pub struct DBTask {
+    pub id: String,
+    pub name: String,
+    pub database_id: String,
+    pub worksheet_id: String,
 }
