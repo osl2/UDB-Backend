@@ -64,43 +64,11 @@ fn main() {
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(
                 web::scope("/api/v1")
-
-                .service(handlers::account::get_account)
-                .service(handlers::account::update_account)
-                .service(handlers::account::create_account)
-                .service(handlers::account::delete_account)
-                .service(handlers::account::login)
-
-                .service(handlers::courses::get_courses)
-                .service(handlers::courses::create_course)
-                .service(handlers::courses::get_course)
-                .service(handlers::courses::update_course)
-                .service(handlers::courses::delete_course)
-
-                .service(handlers::databases::get_databases)
-                .service(handlers::databases::create_database)
-                .service(handlers::databases::get_database)
-                .service(handlers::databases::update_database)
-                .service(handlers::databases::delete_database)
-
-                .service(handlers::worksheets::get_worksheets)
-                .service(handlers::worksheets::create_worksheet)
-                .service(handlers::worksheets::get_worksheet)
-                .service(handlers::worksheets::update_worksheet)
-                .service(handlers::worksheets::delete_worksheet)
-
-                .service(handlers::tasks::get_tasks)
-                .service(handlers::tasks::create_task)
-                .service(handlers::tasks::get_task)
-                .service(handlers::tasks::update_task)
-                .service(handlers::tasks::delete_task)
-
-                .service(handlers::subtasks::get_subtasks)
-                .service(handlers::subtasks::create_subtask)
-                .service(handlers::subtasks::get_subtask)
-                .service(handlers::subtasks::update_subtask)
-                .service(handlers::subtasks::delete_subtask)
-                .service(handlers::subtasks::verify_subtask_solution)
+                .service(handlers::account::get_scope())
+                .service(handlers::courses::get_scope())
+                .service(handlers::databases::get_scope())
+                .service(handlers::worksheets::get_scope())
+                .service(handlers::tasks::get_scope())
             )
     });
     for addr in configuration.listen_addr {

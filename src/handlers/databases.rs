@@ -1,16 +1,25 @@
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
 use actix_web::{
-    get, put, post, delete, web, Error, HttpRequest, HttpResponse
+    get, put, post, delete, web, Error, HttpRequest, HttpResponse, Scope
 };
 use crate::AppData;
 use crate::schema;
 use crate::models;
 use diesel::prelude::*;
 
+pub fn get_scope() -> Scope {
+    web::scope("/databases")
+    .service(get_databases)
+    .service(create_database)
+    .service(get_database)
+    .service(update_database)
+    .service(delete_database)
+}
+
 const CURRENT_USER: &str = "549b60cd-9b88-467b-9b1e-b15c68114c96";  // TODO: user authentication
 
-#[get("/databases")]
+#[get("")]
 pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -36,7 +45,7 @@ pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error 
     }
 }
 
-#[post("/databases")]
+#[post("")]
 pub fn create_database(req: HttpRequest, json: web::Json<models::Database>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -73,7 +82,7 @@ pub fn create_database(req: HttpRequest, json: web::Json<models::Database>) -> B
     }
 }
 
-#[get("/databases/{id}")]
+#[get("/{id}")]
 pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -99,7 +108,7 @@ pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = 
     }
 }
 
-#[put("/databases/{id}")]
+#[put("/{id}")]
 pub fn update_database(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Database>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -124,7 +133,7 @@ pub fn update_database(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<mo
     }
 }
 
-#[delete("/databases/{id}")]
+#[delete("/{id}")]
 pub fn delete_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 

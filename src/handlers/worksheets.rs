@@ -1,26 +1,35 @@
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
 use actix_web::{
-    get, put, post, delete, web, Error, HttpRequest, HttpResponse
+    get, put, post, delete, web, Error, HttpRequest, HttpResponse, Scope
 };
 
-#[get("/worksheets")]
-pub fn get_worksheets(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+pub fn get_scope() -> Scope {
+    web::scope("/worksheets")
+    .service(get_worksheets)
+    .service(create_worksheet)
+    .service(get_worksheet)
+    .service(update_worksheet)
+    .service(delete_worksheet)
+}
+
+#[get("")]
+fn get_worksheets(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
-#[post("/worksheets")]
-pub fn create_worksheet(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+#[post("")]
+fn create_worksheet(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
-#[get("/worksheets/{id}")]
-pub fn get_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+#[get("/{id}")]
+fn get_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
-#[put("/worksheets/{id}")]
-pub fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+#[put("/{id}")]
+fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
-#[delete("/worksheets/{id}")]
-pub fn delete_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+#[delete("/{id}")]
+fn delete_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
