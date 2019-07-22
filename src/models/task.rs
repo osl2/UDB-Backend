@@ -20,12 +20,3 @@ pub struct Task {
     #[serde(rename = "subtasks", skip_serializing_if = "Option::is_none")]
     pub subtasks: Option<Vec<String>>,
 }
-
-#[derive(Debug, Insertable, Queryable, Identifiable)]
-#[table_name = "tasks"]
-pub struct DBTask {
-    pub id: String,
-    pub name: String,
-    pub database_id: String,
-    pub worksheet_id: String,
-}

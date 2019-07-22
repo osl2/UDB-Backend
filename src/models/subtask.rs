@@ -10,10 +10,9 @@
 
 use serde::{Serialize, Deserialize};
 use diesel::{Insertable, Queryable};
-use crate::schema::{subtasks, tasks};
-use crate::models::DBTask;
+use crate::schema::subtasks;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Queryable)]
 pub struct Subtask {
     #[serde(rename = "id")]
     pub id: String,
@@ -25,47 +24,4 @@ pub struct Subtask {
     pub is_solution_visible: bool,
     #[serde(rename = "content", skip_serializing_if = "Option::is_none")]
     pub content: Option<crate::models::Content>,
-}
-
-impl Subtask {
-    pub fn from_db_subtask(subtask: DBSubtask) -> Self {
-        Self {
-            id: subtask.id,
-            instruction: subtask.instruction,
-            is_solution_verifiable: subtask.is_solution_verifiable,
-            is_solution_visible: subtask.is_solution_visible,
-            content: serde_json::from_str(&subtask.content.unwrap()).ok(),  // TODO
-        }
-    }
-}
-
-
-// TODO: combine DBSubtask and Subtask -> task_id optional sowieso und serde kann überspringen?
-// TODO: content braucht dann tosql bzw. queryable implementation als json blob
-
-
-
-#[derive(Debug, Queryable, Insertable, Identifiable, Associations)]
-#[belongs_to(DBTask, foreign_key = "task_id")]
-#[table_name = "subtasks"]
-pub struct DBSubtask {
-    pub id: String,
-    pub instruction: String,
-    pub is_solution_verifiable: bool,
-    pub is_solution_visible: bool,
-    pub content: Option<String>,
-    pub task_id: Option<String>,
-}
-
-impl DBSubtask {
-    pub fn from_subtask(subtask: Subtask) -> Self {
-        Self {
-            id: subtask.id,
-            instruction: subtask.instruction,
-            is_solution_verifiable: subtask.is_solution_verifiable,
-            is_solution_visible: subtask.is_solution_visible,
-            content: serde_json::to_string(&subtask.content).ok(),
-            task_id: None,
-        }
-    }
 }
