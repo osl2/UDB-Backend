@@ -4,7 +4,7 @@ RUN apk add --no-cache \
       cargo \
       build-base \
       sqlite-dev \
-      postgresql-dev
+      postgresql-dev \
  && cd /src \
  && cargo build --release
 
