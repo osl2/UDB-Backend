@@ -28,16 +28,29 @@ table! {
         is_solution_verifiable -> Bool,
         is_solution_visible -> Bool,
         content -> Nullable<Text>,
-        task_id -> Nullable<Text>,
+    }
+}
+
+table! {
+    subtasks_in_tasks (subtask_id, task_id) {
+        subtask_id -> Text,
+        task_id -> Text,
+        position -> Nullable<Integer>,
     }
 }
 
 table! {
     tasks (id) {
         id -> Text,
-        name -> Text,
         database_id -> Nullable<Text>,
-        worksheet_id -> Nullable<Text>,
+    }
+}
+
+table! {
+    tasks_in_worksheets (task_id, worksheet_id) {
+        task_id -> Text,
+        worksheet_id -> Text,
+        position -> Nullable<Integer>,
     }
 }
 
@@ -56,21 +69,34 @@ table! {
         name -> Nullable<Text>,
         is_online -> Bool,
         is_solution_online -> Bool,
-        course_id -> Nullable<Text>,
     }
 }
 
-joinable!(subtasks -> tasks (task_id));
+table! {
+    worksheets_in_courses (worksheet_id, course_id) {
+        worksheet_id -> Text,
+        course_id -> Text,
+        position -> Nullable<Integer>,
+    }
+}
+
+joinable!(subtasks_in_tasks -> subtasks (subtask_id));
+joinable!(subtasks_in_tasks -> tasks (task_id));
 joinable!(tasks -> databases (database_id));
-joinable!(tasks -> worksheets (worksheet_id));
-joinable!(worksheets -> courses (course_id));
+joinable!(tasks_in_worksheets -> tasks (task_id));
+joinable!(tasks_in_worksheets -> worksheets (worksheet_id));
+joinable!(worksheets_in_courses -> courses (course_id));
+joinable!(worksheets_in_courses -> worksheets (worksheet_id));
 
 allow_tables_to_appear_in_same_query!(
     access,
     courses,
     databases,
     subtasks,
+    subtasks_in_tasks,
     tasks,
+    tasks_in_worksheets,
     users,
     worksheets,
+    worksheets_in_courses,
 );

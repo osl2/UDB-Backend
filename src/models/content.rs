@@ -9,6 +9,8 @@
  */
 
 use serde::{Serialize, Deserialize};
+use diesel::Queryable;
+use diesel::backend::Backend;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Content {
@@ -16,8 +18,25 @@ pub enum Content {
     SQL { row_order_matters: bool },
     #[serde(rename = "multiple_choice")]
     MC { answer_options: Vec<String> },
-    Plaintext,
+    Plaintext(String),
     Instruction,
 }
 
+impl<DB, ST> Queryable<ST, DB> for Content
+where
+    DB: Backend,
+    String: Queryable<ST, DB>,
+{
+    type Row = <String as Queryable<ST, DB>>::Row;
 
+    fn build(row: Self::Row) -> Self {
+        match serde_json::from_str(&String::build(row)) {
+            Ok(result) => {
+                result
+            },
+            Err(e) => {
+                Content::Plaintext(format!("Error: {}", e))
+            }
+        }
+    }
+}

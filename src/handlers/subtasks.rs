@@ -36,11 +36,11 @@ fn get_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<Future<Ite
         },
     };
 
-    let query = schema::subtasks::table.find(format!("{}", ids.1)).get_result::<models::DBSubtask>(&*conn);
+    let query = schema::subtasks::table.find(format!("{}", ids.1)).get_result::<models::Subtask>(&*conn);
 
     match query {
         Ok(result) => {
-            Box::new(Ok(HttpResponse::Ok().json(models::Subtask::from_db_subtask(result)).into_future()))
+            Box::new(Ok(HttpResponse::Ok().json(result)).into_future())
         },
         Err(e) => {
             match e {
