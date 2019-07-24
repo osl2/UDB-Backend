@@ -22,7 +22,7 @@ fn get_subtasks(req: HttpRequest, task_id: web::Path<Uuid>) -> Box<Future<Item =
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[post("")]
-fn create_subtask(req: HttpRequest, task_id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn create_subtask(req: HttpRequest, task_id: web::Path<Uuid>, json: web::Json<models::Database>) -> Box<Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[get("/{subtask_id}")]

@@ -9,8 +9,9 @@
  */
 
 use serde::{Serialize, Deserialize};
-use diesel::{Insertable, Queryable};
+use diesel::prelude::*;
 use crate::schema::subtasks;
+use crate::models::Content;
 
 #[derive(Debug, Serialize, Deserialize, Queryable)]
 pub struct Subtask {
@@ -23,5 +24,5 @@ pub struct Subtask {
     #[serde(rename = "solution_visible")]
     pub is_solution_visible: bool,
     #[serde(rename = "content", skip_serializing_if = "Option::is_none")]
-    pub content: Option<crate::models::Content>,
+    pub content: Option<Content>,
 }

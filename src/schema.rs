@@ -42,7 +42,7 @@ table! {
 table! {
     tasks (id) {
         id -> Text,
-        database_id -> Nullable<Text>,
+        database_id -> Text,
     }
 }
 
@@ -50,7 +50,7 @@ table! {
     tasks_in_worksheets (task_id, worksheet_id) {
         task_id -> Text,
         worksheet_id -> Text,
-        position -> Nullable<Integer>,
+        position -> Nullable<Integer>,""
     }
 }
 

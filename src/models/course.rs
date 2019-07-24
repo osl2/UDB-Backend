@@ -11,7 +11,7 @@
 /// Course : The root of the Course type's schema.
 
 use serde::{Serialize, Deserialize};
-use diesel::{Queryable, Insertable};
+use diesel::prelude::*;
 use crate::schema::courses;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -20,18 +20,14 @@ pub struct Course {
     pub id: String,
     #[serde(rename = "name")]
     pub name: String,
-    #[serde(rename = "worksheets")]
-    pub worksheets: Vec<String>,
     #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(rename = "worksheets")]
+    pub worksheets: Option<Vec<String>>,
 }
 
-/// CourseSchema is the actual Database Schema represented as struct, whereas Course is the format
-/// of the JSON sent by the api TODO: improve the names of these classes
-
-#[derive(Debug, Queryable, Insertable, AsChangeset)]
-#[table_name = "courses"]
-pub struct CourseSchema {
+#[derive(Debug, Queryable)]
+pub struct QueryableCourse {
     pub id: String,
     pub name: String,
     pub description: Option<String>,

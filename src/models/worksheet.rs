@@ -9,17 +9,27 @@
  */
 
 use serde::{Serialize, Deserialize};
+use diesel::prelude::*;
+use crate::schema::worksheets;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Worksheet {
-    #[serde(rename = "id", skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    #[serde(rename = "id")]
+    pub id: String,
     #[serde(rename = "name", skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(rename = "released", skip_serializing_if = "Option::is_none")]
-    pub released: Option<bool>,
+    #[serde(rename = "is_online")]
+    pub is_online: bool,
+    #[serde(rename = "is_solution_online")]
+    pub is_solution_online: bool,
     #[serde(rename = "tasks", skip_serializing_if = "Option::is_none")]
     pub tasks: Option<Vec<String>>,
+}
+
+#[derive(Queryable)]
+pub struct QueryableWorksheet {
+    pub id: String,
+    pub name: Option<String>,
+    pub is_online: bool,
+    pub is_solution_online: bool,
 }
