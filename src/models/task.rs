@@ -9,14 +9,21 @@
  */
 
 use serde::{Serialize, Deserialize};
+use diesel::prelude::*;
 use crate::schema::tasks;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Task {
-    #[serde(rename = "id", skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
+    #[serde(rename = "id")]
+    pub id: String,
     #[serde(rename = "database")]
     pub database: String,
     #[serde(rename = "subtasks", skip_serializing_if = "Option::is_none")]
     pub subtasks: Option<Vec<String>>,
+}
+
+#[derive(Debug, Queryable)]
+pub struct QueryableTask {
+    pub id: String,
+    pub database: String,
 }

@@ -9,17 +9,23 @@
  */
 
 use serde::{Serialize, Deserialize};
-use diesel::Queryable;
+use diesel::{Queryable, IntoSql};
+use diesel::expression::AsExpression;
 use diesel::backend::Backend;
+use diesel::serialize::{ToSql, Output};
+use std::io::Write;
+use crate::models::Solution;
 
-#[derive(Debug, Serialize, Deserialize)]
+
+#[derive(Debug, Serialize, Deserialize, AsExpression)]
 pub enum Content {
     #[serde(rename = "sql")]
     SQL { row_order_matters: bool },
     #[serde(rename = "multiple_choice")]
-    MC { answer_options: Vec<String> },
-    Plaintext(String),
+    MC { answer_options: Vec<String>, correct_answer: i64 },
+    Plaintext,
     Instruction,
+    Error(String),
 }
 
 impl<DB, ST> Queryable<ST, DB> for Content
@@ -35,8 +41,9 @@ where
                 result
             },
             Err(e) => {
-                Content::Plaintext(format!("Error: {}", e))
+                Content::Error(format!("ERROR: {}", e))  // TODO
             }
         }
     }
 }
+

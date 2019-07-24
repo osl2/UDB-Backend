@@ -19,7 +19,7 @@ CREATE TABLE worksheets (
 
 CREATE TABLE tasks (
     id CHAR(36) PRIMARY KEY NOT NULL,
-    database_id CHAR(36),
+    database_id CHAR(36) NOT NULL,
     FOREIGN KEY (database_id) REFERENCES databases(id)
 );
 
