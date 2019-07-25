@@ -28,7 +28,7 @@ impl AppData {
         Self {
             settings: config,
             db_connection_pool: pool,
-            current_user:  Uuid::parse_str("549b60cd-9b88-467b-9b1e-b15c68114c96").unwrap(),  // test user
+            current_user: Uuid::parse_str("549b60cd-9b88-467b-9b1e-b15c68114c96").unwrap(),  // test user
         }
     }
 
@@ -36,10 +36,10 @@ impl AppData {
         match &self.db_connection_pool {
             Some(pool) => {
                 match pool.get() {
-                    Ok(connection) => { Ok(connection) },
+                    Ok(connection) => { Ok(connection) }
                     Err(e) => Err(())
                 }
-            },
+            }
             None => Err(())
         }
     }
@@ -72,16 +72,16 @@ fn main() {
             .data(appstate.clone())
             .wrap(actix_web::middleware::Logger::default())
             .wrap(actix_web::middleware::DefaultHeaders::new()
-                .header("Access-Control-Allow-Origin", "*"))  // CORS allow all for now
+                .header("Access-Control-Allow-Origin", appstate.settings.allowed_frontend.clone()))  // CORS allow all for now
             .wrap(prometheus.clone())
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(
                 web::scope("/api/v1")
-                .service(handlers::account::get_scope())
-                .service(handlers::courses::get_scope())
-                .service(handlers::databases::get_scope())
-                .service(handlers::worksheets::get_scope())
-                .service(handlers::tasks::get_scope())
+                    .service(handlers::account::get_scope())
+                    .service(handlers::courses::get_scope())
+                    .service(handlers::databases::get_scope())
+                    .service(handlers::worksheets::get_scope())
+                    .service(handlers::tasks::get_scope())
             )
     });
     for addr in configuration.listen_addr {

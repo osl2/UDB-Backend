@@ -57,7 +57,55 @@ fn get_courses(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Erro
 }
 #[post("")]
 fn create_course(req: HttpRequest, json: web::Json<models::Course>) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
+    let appdata: &AppData = req.app_data().unwrap();
+
+    let conn = match appdata.get_db_connection(){
+        Ok(connection) => connection,
+        Err(_) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        },
+    };
+
+    // create course object
+    let course = json.into_inner();
+    let course_id = Uuid::new_v4();
+    let new_course = models::QueryableCourse {
+        id: course_id.to_string(),
+        name: course.name,
+        description: course.description,
+    };
+
+    // insert access for user
+    match diesel::insert_into(schema::access::table)
+        .values(models::Access{ user_id: appdata.current_user.to_string(), object_id: course_id.to_string() })
+        .execute(&*conn) {
+        Ok(result) => {},
+        Err(e) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        }
+    }
+
+    // set worksheets belonging to course
+    for worksheet in course.worksheets.unwrap() {
+        match diesel::insert_into(schema::worksheets_in_courses::table)
+            .values(models::WorksheetsInCourse {worksheet_id: worksheet, course_id: course_id.to_string()})
+            .execute(&*conn) {
+            Ok(result) => {},
+            Err(e) => {
+                return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+            }
+        }
+    }
+
+    // insert course object
+    match diesel::insert_into(schema::courses::table).values(new_course).execute(&*conn) {
+        Ok(result) => {
+            Box::new(Ok(HttpResponse::Ok().json(course_id)).into_future())
+        }
+        Err(e) => {
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
+    }
 }
 #[get("/{id}")]
 fn get_course(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {

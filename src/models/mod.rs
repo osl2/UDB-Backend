@@ -5,7 +5,7 @@ pub use self::account_update::AccountUpdate;
 mod content;
 pub use self::content::Content;
 mod course;
-pub use self::course::{Course, QueryableCourse};
+pub use self::course::{Course, QueryableCourse, WorksheetsInCourse};
 mod database;
 pub use self::database::Database;
 mod solution;

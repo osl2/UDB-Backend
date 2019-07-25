@@ -13,6 +13,7 @@
 use serde::{Serialize, Deserialize};
 use diesel::prelude::*;
 use crate::schema::courses;
+use crate::schema::worksheets_in_courses;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Course {
@@ -26,10 +27,16 @@ pub struct Course {
     pub worksheets: Option<Vec<String>>,
 }
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Queryable, Insertable)]
+#[table_name = "courses"]
 pub struct QueryableCourse {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
 }
 
+#[derive(Debug, Queryable, Insertable)]
+pub struct WorksheetsInCourse {
+    pub worksheet_id: String,
+    pub course_id: String,
+}
