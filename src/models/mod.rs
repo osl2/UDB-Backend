@@ -17,6 +17,6 @@ pub use self::task::{Task, QueryableTask};
 mod token;
 pub use self::token::Token;
 mod worksheet;
-pub use self::worksheet::{Worksheet, QueryableWorksheet};
+pub use self::worksheet::{Worksheet, QueryableWorksheet, TasksInWorksheet};
 mod access;
 pub use self::access::Access;

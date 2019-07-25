@@ -11,6 +11,7 @@
 use serde::{Serialize, Deserialize};
 use diesel::prelude::*;
 use crate::schema::worksheets;
+use crate::schema::tasks_in_worksheets;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Worksheet {
@@ -26,10 +27,17 @@ pub struct Worksheet {
     pub tasks: Option<Vec<String>>,
 }
 
-#[derive(Queryable)]
+#[derive(Queryable, Insertable)]
+#[table_name = "worksheets"]
 pub struct QueryableWorksheet {
     pub id: String,
     pub name: Option<String>,
     pub is_online: bool,
     pub is_solution_online: bool,
+}
+
+#[derive(Debug, Queryable, Insertable)]
+pub struct TasksInWorksheet {
+    pub task_id: String,
+    pub worksheet_id: String,
 }
