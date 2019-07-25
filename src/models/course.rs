@@ -27,12 +27,22 @@ pub struct Course {
     pub worksheets: Option<Vec<String>>,
 }
 
-#[derive(Debug, Queryable, Insertable)]
+#[derive(Debug, Queryable, Insertable, AsChangeset)]
 #[table_name = "courses"]
 pub struct QueryableCourse {
     pub id: String,
     pub name: String,
     pub description: Option<String>,
+}
+
+impl QueryableCourse {
+    pub fn from_course(course: Course) -> Self {
+        Self {
+            id: course.id,
+            name: course.name,
+            description: course.description,
+        }
+    }
 }
 
 #[derive(Debug, Queryable, Insertable)]

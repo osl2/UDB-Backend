@@ -144,7 +144,27 @@ fn get_course(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpRe
 }
 #[put("/{id}")]
 fn update_course(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Course>) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
+    let appdata: &AppData = req.app_data().unwrap();
+
+    let conn = match appdata.get_db_connection(){
+        Ok(connection) => connection,
+        Err(_) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        },
+    };
+
+    let query = diesel::update(schema::courses::table.find(format!("{}", id)))
+        .set(models::QueryableCourse::from_course(json.into_inner()))
+        .execute(&*conn);
+
+    match query {
+        Ok(result) => {
+            Box::new(Ok(HttpResponse::Ok().finish()).into_future())
+        },
+        Err(e) => {
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
+    }
 }
 #[delete("/{id}")]
 fn delete_course(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
