@@ -50,7 +50,7 @@ table! {
     tasks_in_worksheets (task_id, worksheet_id) {
         task_id -> Text,
         worksheet_id -> Text,
-        position -> Nullable<Integer>,""
+        position -> Nullable<Integer>,
     }
 }
 

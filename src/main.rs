@@ -43,6 +43,14 @@ impl AppData {
             None => Err(())
         }
     }
+
+    pub fn get_user(&self) -> Uuid {
+        self.current_user
+    }
+
+    pub fn set_user(&mut self, id: Uuid) {
+        self.current_user = id;
+    }
 }
 
 fn main() {
