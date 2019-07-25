@@ -1,5 +1,5 @@
 [package]
-name = "udb-back"
+name = "upowdb-backend"
 version = "0.1.0"
 authors = ["Jan Christian Grünhage <jan.christian@gruenhage.xyz>", "David Lamm <david-lamm@web.de>"]
 edition = "2018"
