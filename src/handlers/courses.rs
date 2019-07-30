@@ -153,16 +153,39 @@ fn update_course(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::
         },
     };
 
-    let query = diesel::update(schema::courses::table.find(format!("{}", id)))
-        .set(models::QueryableCourse::from_course(json.into_inner()))
-        .execute(&*conn);
+    let course = json.into_inner();
 
+    // update course
+    let query = diesel::update(schema::courses::table.find(format!("{}", id)))
+        .set(models::QueryableCourse::from_course(course.clone()))
+        .execute(&*conn);
     match query {
-        Ok(result) => {
-            Box::new(Ok(HttpResponse::Ok().finish()).into_future())
+        Ok(result) => {},
+        Err(e) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        }
+    }
+
+    // update which worksheets belong to course
+    match diesel::delete(schema::worksheets_in_courses::table.filter(schema::worksheets_in_courses::course_id.eq(course.id.clone())))
+        .execute(&*conn) {
+        Ok(result) => {/*
+            let worksheets_in_course = course.worksheets.unwrap().iter()
+                .map(|worksheet| models::WorksheetsInCourse { worksheet_id: worksheet.to_string(), course_id: course.id.clone() })
+                .collect();
+            match diesel::insert_into(schema::worksheets_in_courses::table)
+                .values(worksheets_in_course).execute(&*conn) {
+                Ok(result) => {
+                    return Box::new(Ok(HttpResponse::Ok().finish()).into_future());
+                }
+                Err(e) => {*/
+                    return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+                /*}
+            }*/
+
         },
         Err(e) => {
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
         }
     }
 }

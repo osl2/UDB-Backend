@@ -15,7 +15,7 @@ use diesel::prelude::*;
 use crate::schema::courses;
 use crate::schema::worksheets_in_courses;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Course {
     #[serde(rename = "id")]
     pub id: String,

@@ -146,8 +146,28 @@ fn get_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = Htt
     }
 }
 #[put("/{id}")]
-fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
+fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Worksheet>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+    let appdata: &AppData = req.app_data().unwrap();
+
+    let conn = match appdata.get_db_connection(){
+        Ok(connection) => connection,
+        Err(_) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        },
+    };
+
+    let query = diesel::update(schema::worksheets::table.find(format!("{}", id)))
+        .set(models::QueryableWorksheet::from_worksheet(json.into_inner()))
+        .execute(&*conn);
+
+    match query {
+        Ok(result) => {
+            Box::new(Ok(HttpResponse::Ok().finish()).into_future())
+        },
+        Err(e) => {
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
+    }
 }
 #[delete("/{id}")]
 fn delete_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {

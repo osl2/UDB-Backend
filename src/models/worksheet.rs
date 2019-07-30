@@ -27,13 +27,24 @@ pub struct Worksheet {
     pub tasks: Option<Vec<String>>,
 }
 
-#[derive(Queryable, Insertable)]
+#[derive(Queryable, Insertable, AsChangeset)]
 #[table_name = "worksheets"]
 pub struct QueryableWorksheet {
     pub id: String,
     pub name: Option<String>,
     pub is_online: bool,
     pub is_solution_online: bool,
+}
+
+impl QueryableWorksheet {
+    pub fn from_worksheet(worksheet: Worksheet) -> Self {
+        Self {
+            id: worksheet.id,
+            name: worksheet.name,
+            is_online: worksheet.is_online,
+            is_solution_online: worksheet.is_solution_online,
+        }
+    }
 }
 
 #[derive(Debug, Queryable, Insertable)]
