@@ -19,7 +19,7 @@ pub fn get_scope() -> Scope {
 }
 
 #[get("")]
-fn get_worksheets(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -58,7 +58,7 @@ fn get_worksheets(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = E
     }
 }
 #[post("")]
-fn create_worksheet(req: HttpRequest, json: web::Json<models::Worksheet>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn create_worksheet(req: HttpRequest, json: web::Json<models::Worksheet>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -115,7 +115,7 @@ fn create_worksheet(req: HttpRequest, json: web::Json<models::Worksheet>) -> Box
     }
 }
 #[get("/{id}")]
-fn get_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn get_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -151,7 +151,7 @@ fn get_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = Htt
     }
 }
 #[put("/{id}")]
-fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Worksheet>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Worksheet>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -207,7 +207,7 @@ fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<model
     }
 }
 #[delete("/{id}")]
-fn delete_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn delete_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){

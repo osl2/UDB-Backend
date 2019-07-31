@@ -19,7 +19,7 @@ pub fn get_scope() -> Scope {
 }
 
 #[get("")]
-fn get_courses(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -57,7 +57,7 @@ fn get_courses(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Erro
     }
 }
 #[post("")]
-fn create_course(req: HttpRequest, json: web::Json<models::Course>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn create_course(req: HttpRequest, json: web::Json<models::Course>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -109,7 +109,7 @@ fn create_course(req: HttpRequest, json: web::Json<models::Course>) -> Box<Futur
     }
 }
 #[get("/{id}")]
-fn get_course(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn get_course(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -145,7 +145,7 @@ fn get_course(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpRe
     }
 }
 #[put("/{id}")]
-fn update_course(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Course>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn update_course(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Course>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -200,7 +200,7 @@ fn update_course(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::
     }
 }
 #[delete("/{id}")]
-fn delete_course(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn delete_course(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){

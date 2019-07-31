@@ -22,7 +22,7 @@ pub fn get_scope() -> Scope {
 }
 
 #[get("")]
-fn get_tasks(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item=HttpResponse, Error=Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -59,7 +59,7 @@ fn get_tasks(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>
     }
 }
 #[post("")]
-fn create_task(req: HttpRequest, json: web::Json<models::Task>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn create_task(req: HttpRequest, json: web::Json<models::Task>) -> Box<dyn Future<Item=HttpResponse, Error=Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -114,7 +114,7 @@ fn create_task(req: HttpRequest, json: web::Json<models::Task>) -> Box<Future<It
     }
 }
 #[get("/{id}")]
-fn get_task(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn get_task(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item=HttpResponse, Error=Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -149,7 +149,7 @@ fn get_task(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResp
     }
 }
 #[put("/{id}")]
-fn update_task(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Task>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn update_task(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Task>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -205,7 +205,7 @@ fn update_task(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Ta
     }
 }
 #[delete("/{id}")]
-fn delete_task(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn delete_task(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){

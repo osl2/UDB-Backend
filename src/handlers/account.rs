@@ -13,22 +13,22 @@ pub fn get_scope() -> Scope {
 }
 
 #[get("")]
-fn get_account(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn get_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[put("")]
-fn update_account(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn update_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[post("")]
-fn create_account(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn create_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[delete("")]
-fn delete_account(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn delete_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[post("/login")]
-fn login(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn login(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }

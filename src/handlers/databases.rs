@@ -18,7 +18,7 @@ pub fn get_scope() -> Scope {
 }
 
 #[get("")]
-pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error = Error>> {
+pub fn get_databases(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -44,7 +44,7 @@ pub fn get_databases(req: HttpRequest) -> Box<Future<Item = HttpResponse, Error 
 }
 
 #[post("")]
-pub fn create_database(req: HttpRequest, json: web::Json<models::Database>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+pub fn create_database(req: HttpRequest, json: web::Json<models::Database>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -81,7 +81,7 @@ pub fn create_database(req: HttpRequest, json: web::Json<models::Database>) -> B
 }
 
 #[get("/{id}")]
-pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -107,7 +107,7 @@ pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = 
 }
 
 #[put("/{id}")]
-pub fn update_database(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Database>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+pub fn update_database(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Database>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -132,7 +132,7 @@ pub fn update_database(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<mo
 }
 
 #[delete("/{id}")]
-pub fn delete_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+pub fn delete_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){

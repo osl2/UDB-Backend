@@ -18,15 +18,15 @@ pub fn get_scope() -> Scope {
 }
 
 #[get("")]
-fn get_subtasks(req: HttpRequest, task_id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn get_subtasks(req: HttpRequest, task_id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[post("")]
-fn create_subtask(req: HttpRequest, task_id: web::Path<Uuid>, json: web::Json<models::Database>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn create_subtask(req: HttpRequest, task_id: web::Path<Uuid>, json: web::Json<models::Database>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[get("/{subtask_id}")]
-fn get_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn get_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
     let conn = match appdata.get_db_connection(){
@@ -51,14 +51,14 @@ fn get_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<Future<Ite
     }
 }
 #[put("/{subtask_id}")]
-fn update_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn update_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[delete("/{subtask_id}")]
-fn delete_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn delete_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[post("/{subtask_id}")]
-fn verify_subtask_solution(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+fn verify_subtask_solution(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
