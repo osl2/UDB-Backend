@@ -210,7 +210,19 @@ fn delete_course(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = Htt
         },
     };
 
-    let query = diesel::delete(schema::courses::table.find(format!("{}", id.into_inner())))
+    let uuid = id.into_inner();
+
+    match diesel::delete(schema::worksheets_in_courses::table
+        .filter(schema::worksheets_in_courses::course_id.eq(uuid.to_string())))
+        .execute(&*conn) {
+        Ok(result) => {},
+        Err(e) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        }
+    }
+
+
+    let query = diesel::delete(schema::courses::table.find(format!("{}", uuid)))
         .execute(&*conn);
     match query {
         Ok(result) => {
