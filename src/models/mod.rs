@@ -12,7 +12,7 @@ mod solution;
 mod subtask;
 pub use self::subtask::Subtask;
 mod task;
-pub use self::task::{Task, QueryableTask};
+pub use self::task::{Task, QueryableTask, SubtasksInTask};
 mod token;
 pub use self::token::Token;
 mod worksheet;
