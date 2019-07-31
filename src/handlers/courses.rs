@@ -41,6 +41,7 @@ fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
                 let worksheets_query = schema::worksheets_in_courses::table
                     .filter(schema::worksheets_in_courses::columns::course_id.eq(&course.id))
                     .select((schema::worksheets_in_courses::columns::worksheet_id))
+                    .order(schema::worksheets_in_courses::position)
                     .load::<String>(&*conn);
                 courses.push(models::Course {
                     id: course.id,

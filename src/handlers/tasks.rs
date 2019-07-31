@@ -44,6 +44,7 @@ fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item=HttpResponse, Error=Error>
                 let subtasks_query = schema::subtasks_in_tasks::table
                     .filter(schema::subtasks_in_tasks::columns::task_id.eq(&task.id))
                     .select((schema::subtasks_in_tasks::columns::subtask_id))
+                    .order(schema::subtasks_in_tasks::position)
                     .load::<String>(&*conn);
                 tasks.push(models::Task {
                     id: task.id,
