@@ -19,7 +19,28 @@ pub fn get_scope() -> Scope {
 
 #[get("")]
 fn get_subtasks(req: HttpRequest, task_id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
+    let appdata: &AppData = req.app_data().unwrap();
+
+    let conn = match appdata.get_db_connection(){
+        Ok(connection) => connection,
+        Err(_) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        },
+    };
+
+    let query = schema::subtasks::table.inner_join(schema::access::table.on(schema::subtasks::columns::id.eq(schema::access::columns::object_id)))
+        .filter(schema::access::columns::user_id.eq(appdata.current_user.to_string()))
+        .select((schema::subtasks::columns::id, schema::subtasks::columns::instruction, schema::subtasks::is_solution_visible, schema::subtasks::is_solution_verifiable, schema::subtasks::content))
+        .load::<models::Subtask>(&*conn);
+
+    match query {
+        Ok(result) => {
+            Box::new(Ok(HttpResponse::Ok().json(result)).into_future())
+        },
+        Err(e) => {
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
+    }
 }
 #[post("")]
 fn create_subtask(req: HttpRequest, task_id: web::Path<Uuid>, json: web::Json<models::Database>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
