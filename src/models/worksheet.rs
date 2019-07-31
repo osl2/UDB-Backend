@@ -13,7 +13,7 @@ use diesel::prelude::*;
 use crate::schema::worksheets;
 use crate::schema::tasks_in_worksheets;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Worksheet {
     #[serde(rename = "id")]
     pub id: String,
@@ -51,4 +51,5 @@ impl QueryableWorksheet {
 pub struct TasksInWorksheet {
     pub task_id: String,
     pub worksheet_id: String,
+    pub position: i32,
 }

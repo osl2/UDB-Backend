@@ -7,6 +7,7 @@ use diesel::prelude::*;
 use crate::schema;
 use crate::models;
 use crate::AppData;
+use crate::models::TasksInWorksheet;
 
 pub fn get_scope() -> Scope {
     web::scope("/worksheets")
@@ -88,9 +89,13 @@ fn create_worksheet(req: HttpRequest, json: web::Json<models::Worksheet>) -> Box
     }
 
     // set tasks belonging to worksheet
-    for task in worksheet.tasks.unwrap() {
+    for (position, task_id) in worksheet.tasks.unwrap().iter().enumerate() {
         match diesel::insert_into(schema::tasks_in_worksheets::table)
-            .values(models::TasksInWorksheet {task_id: task, worksheet_id: worksheet_id.to_string()})
+            .values(models::TasksInWorksheet {
+                task_id: task_id.to_string(),
+                worksheet_id: worksheet_id.to_string(),
+                position: position as i32,
+            })
             .execute(&*conn) {
             Ok(result) => {},
             Err(e) => {
@@ -156,10 +161,76 @@ fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<model
         },
     };
 
-    let query = diesel::update(schema::worksheets::table.find(format!("{}", id)))
-        .set(models::QueryableWorksheet::from_worksheet(json.into_inner()))
-        .execute(&*conn);
+    let worksheet = json.into_inner();
 
+    // update worksheet
+    let query = diesel::update(schema::worksheets::table.find(format!("{}", id)))
+        .set(models::QueryableWorksheet::from_worksheet(worksheet.clone()))
+        .execute(&*conn);
+    match query {
+        Ok(result) => {},
+        Err(e) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        }
+    }
+
+    // update which tasks belong to worksheet
+    match diesel::delete(schema::tasks_in_worksheets::table.filter(schema::tasks_in_worksheets::worksheet_id.eq(worksheet.id.clone())))
+        .execute(&*conn) {
+        Ok(result) => {
+            let mut pos = -1;
+            let worksheet_id = worksheet.id.clone();
+            let tasks_in_worksheet: Vec<TasksInWorksheet> = worksheet.tasks.unwrap().iter()
+                .map(|task_id| {
+                    pos += 1;
+                    models::TasksInWorksheet {
+                        task_id: task_id.to_string(),
+                        worksheet_id: worksheet_id.clone(),
+                        position: pos,
+                    }
+                })
+                .collect();
+            match diesel::insert_into(schema::tasks_in_worksheets::table)
+                .values(tasks_in_worksheet)
+                .execute(&*conn) {
+                Ok(result) => {
+                    return Box::new(Ok(HttpResponse::Ok().finish()).into_future());
+                }
+                Err(e) => {
+                    return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+                }
+            }
+        },
+        Err(e) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        }
+    }
+}
+#[delete("/{id}")]
+fn delete_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
+    let appdata: &AppData = req.app_data().unwrap();
+
+    let conn = match appdata.get_db_connection(){
+        Ok(connection) => connection,
+        Err(_) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        },
+    };
+
+    let uuid = id.into_inner();
+
+    match diesel::delete(schema::tasks_in_worksheets::table
+        .filter(schema::tasks_in_worksheets::worksheet_id.eq(uuid.to_string())))
+        .execute(&*conn) {
+        Ok(result) => {},
+        Err(e) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        }
+    }
+
+
+    let query = diesel::delete(schema::worksheets::table.find(format!("{}", uuid)))
+        .execute(&*conn);
     match query {
         Ok(result) => {
             Box::new(Ok(HttpResponse::Ok().finish()).into_future())
@@ -168,8 +239,4 @@ fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<model
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
-}
-#[delete("/{id}")]
-fn delete_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
