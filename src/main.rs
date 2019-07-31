@@ -1,7 +1,8 @@
 #[macro_use]
 extern crate diesel;
 
-use actix_web::{web, App, HttpServer};
+use actix_web::{web, App, HttpServer, http::header};
+use actix_cors::Cors;
 use log::error;
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::SqliteConnection;
@@ -71,8 +72,7 @@ fn main() {
         App::new()
             .data(appstate.clone())
             .wrap(actix_web::middleware::Logger::default())
-            .wrap(actix_web::middleware::DefaultHeaders::new()
-                .header("Access-Control-Allow-Origin", appstate.settings.allowed_frontend.clone()))  // CORS allow all for now
+            .wrap(Cors::default())
             .wrap(prometheus.clone())
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(
