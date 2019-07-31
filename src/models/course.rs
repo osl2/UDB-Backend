@@ -49,4 +49,5 @@ impl QueryableCourse {
 pub struct WorksheetsInCourse {
     pub worksheet_id: String,
     pub course_id: String,
+    pub position: i32,
 }

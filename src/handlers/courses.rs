@@ -7,6 +7,7 @@ use crate::AppData;
 use crate::schema;
 use crate::models;
 use diesel::prelude::*;
+use crate::models::WorksheetsInCourse;
 
 pub fn get_scope() -> Scope {
     web::scope("/courses")
@@ -86,9 +87,9 @@ fn create_course(req: HttpRequest, json: web::Json<models::Course>) -> Box<Futur
     }
 
     // set worksheets belonging to course
-    for worksheet in course.worksheets.unwrap() {
+    for (position, worksheet) in course.worksheets.unwrap().iter().enumerate() {
         match diesel::insert_into(schema::worksheets_in_courses::table)
-            .values(models::WorksheetsInCourse {worksheet_id: worksheet, course_id: course_id.to_string()})
+            .values(models::WorksheetsInCourse {worksheet_id: worksheet.to_string(), course_id: course_id.to_string(), position: position as i32})
             .execute(&*conn) {
             Ok(result) => {},
             Err(e) => {
@@ -125,6 +126,7 @@ fn get_course(req: HttpRequest, id: web::Path<Uuid>) -> Box<Future<Item = HttpRe
             let worksheets_query = schema::worksheets_in_courses::table
                 .filter(schema::worksheets_in_courses::columns::course_id.eq(format!("{}", id)))
                 .select((schema::worksheets_in_courses::columns::worksheet_id))
+                .order(schema::worksheets_in_courses::position)
                 .load::<String>(&*conn);
 
             Box::new(Ok(HttpResponse::Ok().json(models::Course {
@@ -169,20 +171,28 @@ fn update_course(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::
     // update which worksheets belong to course
     match diesel::delete(schema::worksheets_in_courses::table.filter(schema::worksheets_in_courses::course_id.eq(course.id.clone())))
         .execute(&*conn) {
-        Ok(result) => {/*
-            let worksheets_in_course = course.worksheets.unwrap().iter()
-                .map(|worksheet| models::WorksheetsInCourse { worksheet_id: worksheet.to_string(), course_id: course.id.clone() })
+        Ok(result) => {
+            let mut pos = -1;
+            let course_id = course.id.clone();
+            let worksheets_in_course: Vec<WorksheetsInCourse> = course.worksheets.unwrap().iter()
+                .map(|worksheet_id| {
+                    pos += 1;
+                    models::WorksheetsInCourse {
+                        worksheet_id: worksheet_id.to_string(),
+                        course_id: course_id.clone(),
+                        position: pos,
+                    }
+                })
                 .collect();
             match diesel::insert_into(schema::worksheets_in_courses::table)
                 .values(worksheets_in_course).execute(&*conn) {
                 Ok(result) => {
                     return Box::new(Ok(HttpResponse::Ok().finish()).into_future());
                 }
-                Err(e) => {*/
+                Err(e) => {
                     return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-                /*}
-            }*/
-
+                }
+            }
         },
         Err(e) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());

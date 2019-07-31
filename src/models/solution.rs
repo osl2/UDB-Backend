@@ -11,12 +11,18 @@
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum Solution {
-    #[serde(rename = "sql")]
-    SQL { columns: Vec<String>, rows: Vec<Vec<String>>, query: String },
-    #[serde(rename = "multiple_choice")]
-    MultipleChoice { positions: Vec<i64> },
-    #[serde(rename = "plaintext")]
-    Plaintext { text: String },
-    Instruction,
+pub struct SQLSolution {
+    query: String,
+    columns: Vec<String>,
+    rows: Vec<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MCSolution {
+    correct_positions: Vec<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PlaintextSolution {
+    text: String,
 }

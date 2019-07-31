@@ -14,16 +14,18 @@ use diesel::expression::AsExpression;
 use diesel::backend::Backend;
 use diesel::serialize::{ToSql, Output};
 use std::io::Write;
-use crate::models::Solution;
+use crate::models::solution::{SQLSolution, MCSolution, PlaintextSolution};
 
 
 #[derive(Debug, Serialize, Deserialize, AsExpression)]
 pub enum Content {
     #[serde(rename = "sql")]
-    SQL { row_order_matters: bool },
+    SQL { row_order_matters: bool, solution: SQLSolution },
     #[serde(rename = "multiple_choice")]
-    MC { answer_options: Vec<String>, correct_answer: i64 },
-    Plaintext,
+    MC { answer_options: Vec<String>, solution: MCSolution },
+    #[serde(rename = "plaintext")]
+    Plaintext { solution: PlaintextSolution },
+    #[serde(rename = "instruction")]
     Instruction,
     Error(String),
 }
