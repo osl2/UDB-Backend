@@ -11,6 +11,13 @@
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum Solution {
+    SQL(SQLSolution),
+    MultipleChoice(MCSolution),
+    Text(PlaintextSolution),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SQLSolution {
     query: String,
     columns: Vec<String>,

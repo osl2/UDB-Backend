@@ -9,15 +9,19 @@
  */
 
 use serde::{Serialize, Deserialize};
-use diesel::{Queryable, IntoSql};
+use diesel::{Queryable, IntoSql, deserialize, serialize};
 use diesel::expression::AsExpression;
 use diesel::backend::Backend;
-use diesel::serialize::{ToSql, Output};
+use diesel::serialize::{ToSql, Output, IsNull};
 use std::io::Write;
 use crate::models::solution::{SQLSolution, MCSolution, PlaintextSolution};
+use diesel::deserialize::FromSql;
+use diesel::sql_types::Text;
+use std::error::Error;
 
 
-#[derive(Debug, Serialize, Deserialize, AsExpression)]
+#[derive(Debug, Serialize, Deserialize, FromSqlRow, AsExpression)]
+#[sql_type = "Text"]
 pub enum Content {
     #[serde(rename = "sql")]
     SQL { row_order_matters: bool, solution: SQLSolution },
@@ -30,22 +34,35 @@ pub enum Content {
     Error(String),
 }
 
-impl<DB, ST> Queryable<ST, DB> for Content
+//special to and from sql traits because content gets saved as json
+
+impl<DB> FromSql<Text, DB> for Content
 where
     DB: Backend,
-    String: Queryable<ST, DB>,
+    String: FromSql<Text, DB>,
 {
-    type Row = <String as Queryable<ST, DB>>::Row;
-
-    fn build(row: Self::Row) -> Self {
-        match serde_json::from_str(&String::build(row)) {
-            Ok(result) => {
-                result
+    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
+        match String::from_sql(bytes) {
+            Ok(json) => match serde_json::from_str(&json) {
+                Ok(content) => Ok(content),
+                Err(x) => Err(Box::new(x)),
             },
-            Err(e) => {
-                Content::Error(format!("ERROR: {}", e))  // TODO
-            }
+            Err(e) => Err(e)
         }
     }
 }
 
+impl<DB> ToSql<Text, DB> for Content
+where
+    DB: Backend,
+    String: FromSql<Text, DB>,
+{
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+        match serde_json::to_string(self) {
+            Ok(json) => out.write_fmt(format_args!("{}", json))
+                .map(|_| IsNull::No)
+                .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>),
+            Err(e) => Err(Box::new(e)),
+        }
+    }
+}

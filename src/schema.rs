@@ -27,6 +27,7 @@ table! {
         instruction -> Text,
         is_solution_verifiable -> Bool,
         is_solution_visible -> Bool,
+        allowed_sql -> Integer,
         content -> Nullable<Text>,
     }
 }
@@ -35,7 +36,7 @@ table! {
     subtasks_in_tasks (subtask_id, task_id) {
         subtask_id -> Text,
         task_id -> Text,
-        position -> Nullable<Integer>,
+        position -> Integer,
     }
 }
 

@@ -9,6 +9,7 @@ pub use self::course::{Course, QueryableCourse, WorksheetsInCourse};
 mod database;
 pub use self::database::Database;
 mod solution;
+pub use self::solution::Solution;
 mod subtask;
 pub use self::subtask::Subtask;
 mod task;
