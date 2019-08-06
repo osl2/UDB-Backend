@@ -1,11 +1,11 @@
+use crate::models;
+use crate::models::TasksInWorksheet;
+use crate::schema;
+use crate::AppData;
+use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
+use diesel::prelude::*;
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
-use diesel::prelude::*;
-use crate::schema;
-use crate::models;
-use crate::AppData;
-use crate::models::TasksInWorksheet;
-use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 
 pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
     web::scope("/worksheets")
@@ -27,16 +27,25 @@ pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
 fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
-    let conn = match appdata.get_db_connection(){
+    let conn = match appdata.get_db_connection() {
         Ok(connection) => connection,
         Err(_) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        },
+        }
     };
 
-    let query = schema::worksheets::table.inner_join(schema::access::table.on(schema::worksheets::columns::id.eq(schema::access::columns::object_id)))
+    let query = schema::worksheets::table
+        .inner_join(
+            schema::access::table
+                .on(schema::worksheets::columns::id.eq(schema::access::columns::object_id)),
+        )
         .filter(schema::access::columns::user_id.eq(appdata.get_user().to_string()))
-        .select((schema::worksheets::columns::id, schema::worksheets::columns::name, schema::worksheets::columns::is_online, schema::worksheets::columns::is_solution_online))
+        .select((
+            schema::worksheets::columns::id,
+            schema::worksheets::columns::name,
+            schema::worksheets::columns::is_online,
+            schema::worksheets::columns::is_solution_online,
+        ))
         .load::<models::QueryableWorksheet>(&*conn);
 
     match query {
@@ -57,20 +66,22 @@ fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error
                 });
             }
             Box::new(Ok(HttpResponse::Ok().json(worksheets)).into_future())
-        },
-        Err(e) => {
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
+        Err(e) => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
     }
 }
-fn create_worksheet(req: HttpRequest, json: web::Json<models::Worksheet>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+
+fn create_worksheet(
+    req: HttpRequest,
+    json: web::Json<models::Worksheet>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
-    let conn = match appdata.get_db_connection(){
+    let conn = match appdata.get_db_connection() {
         Ok(connection) => connection,
         Err(_) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        },
+        }
     };
 
     // create worksheet object
@@ -85,9 +96,13 @@ fn create_worksheet(req: HttpRequest, json: web::Json<models::Worksheet>) -> Box
 
     // insert access for user
     match diesel::insert_into(schema::access::table)
-        .values(models::Access{ user_id: appdata.current_user.to_string(), object_id: worksheet_id.to_string() })
-        .execute(&*conn) {
-        Ok(result) => {},
+        .values(models::Access {
+            user_id: appdata.current_user.to_string(),
+            object_id: worksheet_id.to_string(),
+        })
+        .execute(&*conn)
+    {
+        Ok(result) => {}
         Err(e) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
         }
@@ -101,8 +116,9 @@ fn create_worksheet(req: HttpRequest, json: web::Json<models::Worksheet>) -> Box
                 worksheet_id: worksheet_id.to_string(),
                 position: position as i32,
             })
-            .execute(&*conn) {
-            Ok(result) => {},
+            .execute(&*conn)
+        {
+            Ok(result) => {}
             Err(e) => {
                 return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
             }
@@ -110,26 +126,31 @@ fn create_worksheet(req: HttpRequest, json: web::Json<models::Worksheet>) -> Box
     }
 
     // insert worksheet object
-    match diesel::insert_into(schema::worksheets::table).values(new_worksheet).execute(&*conn) {
-        Ok(result) => {
-            Box::new(Ok(HttpResponse::Ok().json(worksheet_id)).into_future())
-        }
-        Err(e) => {
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+    match diesel::insert_into(schema::worksheets::table)
+        .values(new_worksheet)
+        .execute(&*conn)
+    {
+        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(worksheet_id)).into_future()),
+        Err(e) => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
     }
 }
-fn get_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+
+fn get_worksheet(
+    req: HttpRequest,
+    id: web::Path<Uuid>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
-    let conn = match appdata.get_db_connection(){
+    let conn = match appdata.get_db_connection() {
         Ok(connection) => connection,
         Err(_) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        },
+        }
     };
 
-    let query = schema::worksheets::table.find(format!("{}", id)).get_result::<models::QueryableWorksheet>(&*conn);
+    let query = schema::worksheets::table
+        .find(format!("{}", id))
+        .get_result::<models::QueryableWorksheet>(&*conn);
 
     match query {
         Ok(worksheet) => {
@@ -139,52 +160,69 @@ fn get_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item =
                 .order(schema::tasks_in_worksheets::position)
                 .load::<String>(&*conn);
 
-            Box::new(Ok(HttpResponse::Ok().json(models::Worksheet {
-                id: worksheet.id,
-                name: worksheet.name,
-                is_online: worksheet.is_online,
-                is_solution_online: worksheet.is_solution_online,
-                tasks: tasks_query.ok(),
-            })).into_future())
-        },
-        Err(e) => {
-            match e {
-                diesel::result::Error::NotFound => Box::new(Ok(HttpResponse::NotFound().finish()).into_future()),
-                _ => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
-            }
+            Box::new(
+                Ok(HttpResponse::Ok().json(models::Worksheet {
+                    id: worksheet.id,
+                    name: worksheet.name,
+                    is_online: worksheet.is_online,
+                    is_solution_online: worksheet.is_solution_online,
+                    tasks: tasks_query.ok(),
+                }))
+                .into_future(),
+            )
         }
+        Err(e) => match e {
+            diesel::result::Error::NotFound => {
+                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
+            }
+            _ => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
+        },
     }
 }
-fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Worksheet>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+
+fn update_worksheet(
+    req: HttpRequest,
+    id: web::Path<Uuid>,
+    json: web::Json<models::Worksheet>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
-    let conn = match appdata.get_db_connection(){
+    let conn = match appdata.get_db_connection() {
         Ok(connection) => connection,
         Err(_) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        },
+        }
     };
 
     let worksheet = json.into_inner();
 
     // update worksheet
     let query = diesel::update(schema::worksheets::table.find(format!("{}", id)))
-        .set(models::QueryableWorksheet::from_worksheet(worksheet.clone()))
+        .set(models::QueryableWorksheet::from_worksheet(
+            worksheet.clone(),
+        ))
         .execute(&*conn);
     match query {
-        Ok(result) => {},
+        Ok(result) => {}
         Err(e) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
         }
     }
 
     // update which tasks belong to worksheet
-    match diesel::delete(schema::tasks_in_worksheets::table.filter(schema::tasks_in_worksheets::worksheet_id.eq(worksheet.id.clone())))
-        .execute(&*conn) {
+    match diesel::delete(
+        schema::tasks_in_worksheets::table
+            .filter(schema::tasks_in_worksheets::worksheet_id.eq(worksheet.id.clone())),
+    )
+    .execute(&*conn)
+    {
         Ok(result) => {
             let mut pos = -1;
             let worksheet_id = worksheet.id.clone();
-            let tasks_in_worksheet: Vec<TasksInWorksheet> = worksheet.tasks.unwrap().iter()
+            let tasks_in_worksheet: Vec<TasksInWorksheet> = worksheet
+                .tasks
+                .unwrap()
+                .iter()
                 .map(|task_id| {
                     pos += 1;
                     models::TasksInWorksheet {
@@ -196,50 +234,54 @@ fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<model
                 .collect();
             match diesel::insert_into(schema::tasks_in_worksheets::table)
                 .values(tasks_in_worksheet)
-                .execute(&*conn) {
+                .execute(&*conn)
+            {
                 Ok(result) => {
                     return Box::new(Ok(HttpResponse::Ok().finish()).into_future());
                 }
                 Err(e) => {
-                    return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+                    return Box::new(
+                        Ok(HttpResponse::InternalServerError().finish()).into_future(),
+                    );
                 }
             }
-        },
+        }
         Err(e) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
         }
     }
 }
-fn delete_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+
+fn delete_worksheet(
+    req: HttpRequest,
+    id: web::Path<Uuid>,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
-    let conn = match appdata.get_db_connection(){
+    let conn = match appdata.get_db_connection() {
         Ok(connection) => connection,
         Err(_) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        },
+        }
     };
 
     let uuid = id.into_inner();
 
-    match diesel::delete(schema::tasks_in_worksheets::table
-        .filter(schema::tasks_in_worksheets::worksheet_id.eq(uuid.to_string())))
-        .execute(&*conn) {
-        Ok(result) => {},
+    match diesel::delete(
+        schema::tasks_in_worksheets::table
+            .filter(schema::tasks_in_worksheets::worksheet_id.eq(uuid.to_string())),
+    )
+    .execute(&*conn)
+    {
+        Ok(result) => {}
         Err(e) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
         }
     }
 
-
-    let query = diesel::delete(schema::worksheets::table.find(format!("{}", uuid)))
-        .execute(&*conn);
+    let query = diesel::delete(schema::worksheets::table.find(format!("{}", uuid))).execute(&*conn);
     match query {
-        Ok(result) => {
-            Box::new(Ok(HttpResponse::Ok().finish()).into_future())
-        },
-        Err(e) => {
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+        Ok(result) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Err(e) => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
     }
 }

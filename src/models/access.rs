@@ -1,5 +1,5 @@
-use diesel::{Queryable, Insertable};
 use crate::schema::access;
+use diesel::{Insertable, Queryable};
 
 #[derive(Debug, Queryable, Insertable, Clone, AsChangeset)]
 #[table_name = "access"]

@@ -22,4 +22,3 @@ pub(crate) fn setup_logging(level: log::LevelFilter) {
         _ => info!("logging set up properly"),
     }
 }
-

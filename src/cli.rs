@@ -11,4 +11,3 @@ pub(crate) fn setup_cli() -> clap::ArgMatches<'static> {
     )
     .get_matches()
 }
-
