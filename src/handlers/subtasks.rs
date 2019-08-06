@@ -161,11 +161,33 @@ fn get_subtask(
         },
     }
 }
+#[put("/{subtask_id}")]
 fn update_subtask(
     req: HttpRequest,
     ids: web::Path<(Uuid, Uuid)>,
+    json: web::Json<models::Subtask>
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
+    let appdata: &AppData = req.app_data().unwrap();
+
+    let conn = match appdata.get_db_connection(){
+        Ok(connection) => connection,
+        Err(_) => {
+            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+        },
+    };
+
+    let query = diesel::update(schema::subtasks::table.find(format!("{}", ids.1)))
+        .set(json.into_inner())
+        .execute(&*conn);
+
+    match query {
+        Ok(result) => {
+            Box::new(Ok(HttpResponse::Ok().finish()).into_future())
+        },
+        Err(e) => {
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
+    }
 }
 fn delete_subtask(
     req: HttpRequest,
