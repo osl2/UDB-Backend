@@ -1,4 +1,4 @@
-FROM docker.io/alpine as builder
+FROM docker.io/alpine:edge as builder
 COPY . /src
 RUN apk add --no-cache \
       cargo \
@@ -9,6 +9,6 @@ RUN apk add --no-cache \
  && cargo build --release
 
 
-FROM docker.io/alpine
+FROM docker.io/alpine:edge
 COPY --from=builder /src/target/release/upowdb-backend /usr/local/bin/upowdb-backend
 CMD ["/usr/local/bin/upowdb-backend"]
