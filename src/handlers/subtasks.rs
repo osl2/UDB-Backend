@@ -1,24 +1,30 @@
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
-use actix_web::{
-    get, put, post, delete, web, Error, HttpRequest, HttpResponse, Scope
-};
 use diesel::prelude::*;
 use crate::AppData;
 use crate::schema;
 use crate::models;
 use crate::models::SubtasksInTask;
+use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 
-pub fn get_scope() -> Scope {
+pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
     web::scope("/{task_id}/subtasks")
-    .service(get_subtasks)
-    .service(create_subtask)
-    .service(get_subtask)
-    .service(update_subtask)
-    .service(delete_subtask)
+        .service(
+            web::resource("")
+                .wrap(auth.clone())
+                .route(web::get().to_async(get_subtasks))
+                .route(web::post().to_async(create_subtask)),
+        )
+        .service(
+            web::resource("/{id}")
+                .wrap(auth.clone())
+                .route(web::put().to_async(update_subtask))
+                .route(web::delete().to_async(delete_subtask)),
+        )
+        .service(web::resource("/{id}").route(web::get().to_async(get_subtask)))
+        .service(web::resource("/{id}/verify").route(web::post().to_async(verify_subtask_solution)))
 }
 
-#[get("")]
 fn get_subtasks(req: HttpRequest, task_id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -43,7 +49,6 @@ fn get_subtasks(req: HttpRequest, task_id: web::Path<Uuid>) -> Box<dyn Future<It
         }
     }
 }
-#[post("")]
 fn create_subtask(req: HttpRequest, task_id: web::Path<Uuid>, json: web::Json<models::Subtask>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -107,7 +112,6 @@ fn create_subtask(req: HttpRequest, task_id: web::Path<Uuid>, json: web::Json<mo
         }
     }
 }
-#[get("/{subtask_id}")]
 fn get_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -132,11 +136,9 @@ fn get_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<dyn Future
         }
     }
 }
-#[put("/{subtask_id}")]
 fn update_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
-#[delete("/{subtask_id}")]
 fn delete_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -171,7 +173,6 @@ fn delete_subtask(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>) -> Box<dyn Fut
         }
     }
 }
-#[post("/{subtask_id}")]
 fn verify_subtask_solution(req: HttpRequest, ids: web::Path<(Uuid, Uuid)>, json: web::Json<models::Solution>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 

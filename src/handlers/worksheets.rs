@@ -1,24 +1,29 @@
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
-use actix_web::{
-    get, put, post, delete, web, Error, HttpRequest, HttpResponse, Scope
-};
 use diesel::prelude::*;
 use crate::schema;
 use crate::models;
 use crate::AppData;
 use crate::models::TasksInWorksheet;
+use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 
-pub fn get_scope() -> Scope {
+pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
     web::scope("/worksheets")
-    .service(get_worksheets)
-    .service(create_worksheet)
-    .service(get_worksheet)
-    .service(update_worksheet)
-    .service(delete_worksheet)
+        .service(
+            web::resource("")
+                .wrap(auth.clone())
+                .route(web::get().to_async(get_worksheets))
+                .route(web::post().to_async(create_worksheet)),
+        )
+        .service(
+            web::resource("/{id}")
+                .wrap(auth.clone())
+                .route(web::put().to_async(update_worksheet))
+                .route(web::delete().to_async(delete_worksheet)),
+        )
+        .service(web::resource("/{id}").route(web::get().to_async(get_worksheet)))
 }
 
-#[get("")]
 fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -58,7 +63,6 @@ fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error
         }
     }
 }
-#[post("")]
 fn create_worksheet(req: HttpRequest, json: web::Json<models::Worksheet>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -115,7 +119,6 @@ fn create_worksheet(req: HttpRequest, json: web::Json<models::Worksheet>) -> Box
         }
     }
 }
-#[get("/{id}")]
 fn get_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -152,7 +155,6 @@ fn get_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item =
         }
     }
 }
-#[put("/{id}")]
 fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Worksheet>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -208,7 +210,6 @@ fn update_worksheet(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<model
         }
     }
 }
-#[delete("/{id}")]
 fn delete_worksheet(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 

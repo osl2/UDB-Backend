@@ -1,23 +1,28 @@
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
-use actix_web::{
-    get, put, post, delete, web, Error, HttpRequest, HttpResponse, Scope
-};
 use crate::AppData;
 use crate::schema;
 use crate::models;
+use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 use diesel::prelude::*;
 
-pub fn get_scope() -> Scope {
+pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
     web::scope("/databases")
-    .service(get_databases)
-    .service(create_database)
-    .service(get_database)
-    .service(update_database)
-    .service(delete_database)
+        .service(
+            web::resource("")
+                .wrap(auth.clone())
+                .route(web::get().to_async(get_databases))
+                .route(web::post().to_async(create_database)),
+        )
+        .service(
+            web::resource("/{id}")
+                .wrap(auth.clone())
+                .route(web::put().to_async(update_database))
+                .route(web::delete().to_async(delete_database)),
+        )
+        .service(web::resource("/{id}").route(web::get().to_async(get_database)))
 }
 
-#[get("")]
 pub fn get_databases(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -43,7 +48,6 @@ pub fn get_databases(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Er
     }
 }
 
-#[post("")]
 pub fn create_database(req: HttpRequest, json: web::Json<models::Database>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -80,7 +84,6 @@ pub fn create_database(req: HttpRequest, json: web::Json<models::Database>) -> B
     }
 }
 
-#[get("/{id}")]
 pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -106,7 +109,6 @@ pub fn get_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Ite
     }
 }
 
-#[put("/{id}")]
 pub fn update_database(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Database>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -131,7 +133,6 @@ pub fn update_database(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<mo
     }
 }
 
-#[delete("/{id}")]
 pub fn delete_database(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 

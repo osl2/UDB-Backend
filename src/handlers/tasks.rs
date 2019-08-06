@@ -1,27 +1,32 @@
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
-use actix_web::{
-    get, put, post, delete, web, Error, HttpRequest, HttpResponse, Scope
-};
 use diesel::prelude::*;
 use crate::schema;
 use crate::models;
 use crate::AppData;
 use crate::handlers::subtasks;
+use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 use std::io::SeekFrom::Start;
 use crate::models::Task;
 
-pub fn get_scope() -> Scope {
+pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
     web::scope("/tasks")
-    .service(get_tasks)
-    .service(create_task)
-    .service(get_task)
-    .service(update_task)
-    .service(delete_task)
-    .service(subtasks::get_scope())
+        .service(
+            web::resource("")
+                .wrap(auth.clone())
+                .route(web::get().to_async(get_tasks))
+                .route(web::post().to_async(create_task)),
+        )
+        .service(
+            web::resource("/{id}")
+                .wrap(auth.clone())
+                .route(web::put().to_async(update_task))
+                .route(web::delete().to_async(delete_task)),
+        )
+        .service(web::resource("/{id}").route(web::get().to_async(get_task)))
+        .service(subtasks::get_scope(auth.clone()))
 }
 
-#[get("")]
 fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item=HttpResponse, Error=Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -59,7 +64,6 @@ fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item=HttpResponse, Error=Error>
         }
     }
 }
-#[post("")]
 fn create_task(req: HttpRequest, json: web::Json<models::Task>) -> Box<dyn Future<Item=HttpResponse, Error=Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -114,7 +118,6 @@ fn create_task(req: HttpRequest, json: web::Json<models::Task>) -> Box<dyn Futur
         }
     }
 }
-#[get("/{id}")]
 fn get_task(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item=HttpResponse, Error=Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -149,7 +152,6 @@ fn get_task(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item=HttpRe
         }
     }
 }
-#[put("/{id}")]
 fn update_task(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Task>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
@@ -205,7 +207,6 @@ fn update_task(req: HttpRequest, id: web::Path<Uuid>, json: web::Json<models::Ta
         }
     }
 }
-#[delete("/{id}")]
 fn delete_task(req: HttpRequest, id: web::Path<Uuid>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
