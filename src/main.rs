@@ -1,19 +1,22 @@
 #[macro_use]
 extern crate diesel;
 
-use actix_web::{web, App, HttpServer};
-use log::error;
+use actix_cors::Cors;
+use actix_web::{http::header, web, App, HttpServer};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::SqliteConnection;
+use log::error;
 use uuid::Uuid;
 
-mod settings;
+use actix_web_jwt_middleware::{Algorithm, JwtAuthentication, JwtKey};
+
 mod cli;
-mod logging;
 mod database;
 mod handlers;
+mod logging;
 mod models;
 mod schema;
+mod settings;
 
 #[derive(Clone)]
 struct AppData {
@@ -28,19 +31,19 @@ impl AppData {
         Self {
             settings: config,
             db_connection_pool: pool,
-            current_user: Uuid::parse_str("549b60cd-9b88-467b-9b1e-b15c68114c96").unwrap(),  // test user
+            current_user: Uuid::parse_str("549b60cd-9b88-467b-9b1e-b15c68114c96").unwrap(), // test user
         }
     }
 
-    pub fn get_db_connection(&self) -> Result<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>, ()> {
+    pub fn get_db_connection(
+        &self,
+    ) -> Result<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>, ()> {
         match &self.db_connection_pool {
-            Some(pool) => {
-                match pool.get() {
-                    Ok(connection) => { Ok(connection) }
-                    Err(e) => Err(())
-                }
-            }
-            None => Err(())
+            Some(pool) => match pool.get() {
+                Ok(connection) => Ok(connection),
+                Err(e) => Err(()),
+            },
+            None => Err(()),
         }
     }
 
@@ -62,26 +65,30 @@ fn main() {
         3 => log::LevelFilter::Debug,
         _ => log::LevelFilter::Trace,
     });
-    let configuration = settings::Settings::new(cli_matches.value_of("config").unwrap_or("config.toml")).unwrap();
+    let configuration =
+        settings::Settings::new(cli_matches.value_of("config").unwrap_or("config.toml")).unwrap();
     let sys = actix::System::new("udb-backend");
     let prometheus = actix_web_prom::PrometheusMetrics::new("api", "/metrics");
 
+    let jwt = JwtAuthentication {
+        key: JwtKey::Inline(configuration.jwt_key.clone()),
+        algorithm: Algorithm::HS512,
+    };
     let appstate = AppData::from_configuration(configuration.clone());
     let mut server = HttpServer::new(move || {
         App::new()
             .data(appstate.clone())
             .wrap(actix_web::middleware::Logger::default())
-            .wrap(actix_web::middleware::DefaultHeaders::new()
-                .header("Access-Control-Allow-Origin", appstate.settings.allowed_frontend.clone()))  // CORS allow all for now
+            .wrap(Cors::default())
             .wrap(prometheus.clone())
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(
                 web::scope("/api/v1")
-                    .service(handlers::account::get_scope())
-                    .service(handlers::courses::get_scope())
-                    .service(handlers::databases::get_scope())
-                    .service(handlers::worksheets::get_scope())
-                    .service(handlers::tasks::get_scope())
+                    .service(handlers::account::get_scope(jwt.clone()))
+                    .service(handlers::courses::get_scope(jwt.clone()))
+                    .service(handlers::databases::get_scope(jwt.clone()))
+                    .service(handlers::worksheets::get_scope(jwt.clone()))
+                    .service(handlers::tasks::get_scope(jwt.clone())),
             )
     });
     for addr in configuration.listen_addr {

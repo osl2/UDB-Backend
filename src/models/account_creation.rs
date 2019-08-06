@@ -9,8 +9,7 @@
  */
 
 /// AccountCreation : This struct is passed to the registration endpoint for creating an account.
-
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccountCreation {
@@ -19,5 +18,3 @@ pub struct AccountCreation {
     #[serde(rename = "password")]
     pub password: String,
 }
-
-

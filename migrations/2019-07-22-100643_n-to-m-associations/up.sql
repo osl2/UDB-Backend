@@ -52,7 +52,7 @@ CREATE TABLE tasks_in_worksheets (
 CREATE TABLE subtasks_in_tasks (
     subtask_id CHAR(36) NOT NULL,
     task_id CHAR(36) NOT NULL,
-    position INTEGER,
+    position INTEGER NOT NULL,
     FOREIGN KEY (subtask_id) REFERENCES subtasks(id),
     FOREIGN KEY (task_id) REFERENCES tasks(id),
     PRIMARY KEY (subtask_id, task_id)

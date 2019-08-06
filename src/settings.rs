@@ -1,5 +1,5 @@
-use config::{ConfigError, Config, File, Environment};
 use crate::database::DatabaseConnectionConfig;
+use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
