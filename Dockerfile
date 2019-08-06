@@ -11,4 +11,8 @@ RUN apk add --no-cache \
 
 FROM docker.io/alpine:edge
 COPY --from=builder /src/target/release/upowdb-backend /usr/local/bin/upowdb-backend
+RUN apk add --no-cache \
+      sqlite-libs \
+      postgresql-libs \
+      libgcc \
 CMD ["/usr/local/bin/upowdb-backend"]
