@@ -14,6 +14,7 @@ mod cli;
 mod database;
 mod handlers;
 mod logging;
+mod middlewares;
 mod models;
 mod schema;
 mod settings;
@@ -81,6 +82,7 @@ fn main() {
             .wrap(actix_web::middleware::Logger::default())
             .wrap(Cors::default())
             .wrap(prometheus.clone())
+            .wrap(middlewares::upload_filter::UploadFilter { filter: false })
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(
                 web::scope("/api/v1")
