@@ -10,5 +10,5 @@ RUN apk add --no-cache \
 
 
 FROM docker.io/alpine
-COPY --from=builder /src/target/release/udb-back /usr/local/bin/udb-back
-CMD ["/usr/local/bin/udb-back"]
+COPY --from=builder /src/target/release/upowdb-backend /usr/local/bin/upowdb-backend
+CMD ["/usr/local/bin/upowdb-backend"]
