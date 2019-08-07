@@ -18,6 +18,7 @@ mod middlewares;
 mod models;
 mod schema;
 mod settings;
+mod solution_compare;
 
 #[derive(Clone)]
 struct AppData {

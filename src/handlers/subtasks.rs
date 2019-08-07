@@ -2,6 +2,7 @@ use crate::models;
 use crate::models::SubtasksInTask;
 use crate::schema;
 use crate::AppData;
+use crate::solution_compare::compare_solutions;
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 use diesel::prelude::*;
 use futures::future::{Future, IntoFuture};
@@ -256,8 +257,12 @@ fn verify_subtask_solution(
                 // this subtask does not have a public solution
                 return Box::new(Ok(HttpResponse::NotFound().finish()).into_future());
             }
-            // TODO: compare solutions
-            Box::new(Ok(HttpResponse::Ok().json(false)).into_future())
+
+            let teacher_solution = subtask.content.unwrap().get_solution().unwrap();
+
+            let result = compare_solutions(student_solution, teacher_solution);
+
+            Box::new(Ok(HttpResponse::Ok().json(result)).into_future())
         }
         Err(e) => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
     }

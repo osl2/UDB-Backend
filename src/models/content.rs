@@ -10,6 +10,9 @@
 
 use crate::models::solution::{MCSolution, PlaintextSolution, SQLSolution};
 use diesel::backend::Backend;
+use diesel::serialize::{ToSql, Output, IsNull};
+use std::io::Write;
+use crate::models::solution::{Solution, SQLSolution, MCSolution, PlaintextSolution};
 use diesel::deserialize::FromSql;
 use diesel::expression::AsExpression;
 use diesel::serialize::{IsNull, Output, ToSql};
@@ -39,6 +42,23 @@ pub enum Content {
     #[serde(rename = "instruction")]
     Instruction,
     Error(String),
+}
+
+impl Content {
+    pub fn get_solution(&self) -> Option<Solution> {
+        match self {
+            Content::SQL {solution, ..} => {
+                Some(Solution::SQL(solution.clone()))
+            }
+            Content::MC {solution, ..} => {
+                Some(Solution::MultipleChoice(solution.clone()))
+            }
+            Content::Plaintext {solution, ..} => {
+                Some(Solution::Text(solution.clone()))
+            }
+            _ => None
+        }
+    }
 }
 
 //special to and from sql traits because content gets saved as json
