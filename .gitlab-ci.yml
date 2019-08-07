@@ -3,6 +3,7 @@ image: alpine
 stages:
   - test
   - build
+  - deploy
 
 cargo-test:
   stage: test
@@ -44,5 +45,19 @@ docker-develop:
   script:
     - docker build --pull -t "${CI_REGISTRY_IMAGE}:develop" .
     - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
+  only:
+    - develop
+
+deploy-master:
+  image: appropriate/curl
+  script:
+    - curl http://[215:c420:ccfe:37d1:ed42:c4ee:2669:1a8a]:9000/hooks/redeploy-webhook
+  only:
+    - master
+
+deploy-develop:
+  image: appropriate/curl
+  script:
+    - curl http://[215:ff81:c80b:a859:67dd:ab09:26bb:eb30]:9000/hooks/redeploy-webhook
   only:
     - develop
