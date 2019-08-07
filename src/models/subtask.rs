@@ -50,7 +50,7 @@ where
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, AsChangeset)]
 pub struct Subtask {
     #[serde(rename = "id")]
     pub id: String,

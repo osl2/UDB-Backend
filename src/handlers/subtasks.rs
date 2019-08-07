@@ -162,7 +162,6 @@ fn get_subtask(
         },
     }
 }
-#[put("/{subtask_id}")]
 fn update_subtask(
     req: HttpRequest,
     ids: web::Path<(Uuid, Uuid)>,

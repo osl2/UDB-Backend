@@ -12,16 +12,23 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Solution {
+    #[serde(rename = "sql")]
     SQL(SQLSolution),
+    #[serde(rename = "multiple_choice")]
     MultipleChoice(MCSolution),
+    #[serde(rename = "plaintext")]
     Text(PlaintextSolution),
 }
 
 #[derive(Debug, Serialize)]
 pub enum SolutionResult {
+    #[serde(rename = "sql")]
     SQL(SQLSolutionResult),
+    #[serde(rename = "multiple_choice")]
     MultipleChoice(MCSolutionResult),
+    #[serde(rename = "plaintext")]
     Text(PlaintextSolutionResult),
+    #[serde(rename = "error")]
     Error(String),
 }
 
