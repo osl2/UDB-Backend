@@ -23,3 +23,5 @@ mod worksheet;
 pub use self::worksheet::{QueryableWorksheet, TasksInWorksheet, Worksheet};
 mod access;
 pub use self::access::Access;
+pub mod alias;
+pub use self::alias::{Alias, AliasRequest};

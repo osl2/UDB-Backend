@@ -19,6 +19,7 @@ mod models;
 mod schema;
 mod settings;
 mod solution_compare;
+mod alias_generator;
 
 #[derive(Clone)]
 struct AppData {
@@ -91,7 +92,8 @@ fn main() {
                     .service(handlers::courses::get_scope(jwt.clone()))
                     .service(handlers::databases::get_scope(jwt.clone()))
                     .service(handlers::worksheets::get_scope(jwt.clone()))
-                    .service(handlers::tasks::get_scope(jwt.clone())),
+                    .service(handlers::tasks::get_scope(jwt.clone()))
+                    .service(handlers::alias::get_scope(jwt.clone())),
             )
     });
     for addr in configuration.listen_addr {

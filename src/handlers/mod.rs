@@ -4,3 +4,4 @@ pub mod databases;
 pub mod subtasks;
 pub mod tasks;
 pub mod worksheets;
+pub mod alias;
