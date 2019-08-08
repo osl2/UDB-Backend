@@ -19,6 +19,7 @@ pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
         .service(
             web::resource("/{id}")
                 .wrap(auth.clone())
+                .route(web::get().to_async(get_subtask))
                 .route(web::put().to_async(update_subtask))
                 .route(web::delete().to_async(delete_subtask)),
         )
