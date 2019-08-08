@@ -118,7 +118,12 @@ fn create_subtask(
             max_position = association.position;
         }
         Err(e) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+            match e {
+                diesel::NotFound => { max_position = -1; },
+                _ => {
+                    return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+                }
+            }
         }
     }
 
