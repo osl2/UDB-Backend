@@ -51,7 +51,7 @@ fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
             for course in query_courses {
                 let worksheets_query = schema::worksheets_in_courses::table
                     .filter(schema::worksheets_in_courses::columns::course_id.eq(&course.id))
-                    .select((schema::worksheets_in_courses::columns::worksheet_id))
+                    .select(schema::worksheets_in_courses::columns::worksheet_id)
                     .order(schema::worksheets_in_courses::position)
                     .load::<String>(&*conn);
                 courses.push(models::Course {
@@ -145,7 +145,7 @@ fn get_course(
         Ok(course) => {
             let worksheets_query = schema::worksheets_in_courses::table
                 .filter(schema::worksheets_in_courses::columns::course_id.eq(format!("{}", id)))
-                .select((schema::worksheets_in_courses::columns::worksheet_id))
+                .select(schema::worksheets_in_courses::columns::worksheet_id)
                 .order(schema::worksheets_in_courses::position)
                 .load::<String>(&*conn);
 

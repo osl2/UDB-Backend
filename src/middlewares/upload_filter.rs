@@ -55,17 +55,14 @@ where
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
         match self.filter {
-            true => {
-                match req.method().as_str() {
-                    "PUT" | "POST" => Either::A(ok(req.into_response(
-                        actix_web::HttpResponse::build(StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS)
-                            .finish()
-                            .into_body(),
-                        ))),
-                    _ => Either::B(self.service.call(req))
-                }
-                
-            }
+            true => match req.method().as_str() {
+                "PUT" | "POST" => Either::A(ok(req.into_response(
+                    actix_web::HttpResponse::build(StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS)
+                        .finish()
+                        .into_body(),
+                ))),
+                _ => Either::B(self.service.call(req)),
+            },
             false => Either::B(self.service.call(req)),
         }
     }

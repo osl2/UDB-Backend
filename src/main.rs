@@ -2,7 +2,7 @@
 extern crate diesel;
 
 use actix_cors::Cors;
-use actix_web::{http::header, web, App, HttpServer};
+use actix_web::{web, App, HttpServer};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::SqliteConnection;
 use log::error;
@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use actix_web_jwt_middleware::{Algorithm, JwtAuthentication, JwtKey};
 
+mod alias_generator;
 mod cli;
 mod database;
 mod handlers;
@@ -20,7 +21,6 @@ mod models;
 mod schema;
 mod settings;
 mod solution_compare;
-mod alias_generator;
 
 #[derive(Clone)]
 struct AppData {
@@ -53,10 +53,6 @@ impl AppData {
 
     pub fn get_user(&self) -> Uuid {
         self.current_user
-    }
-
-    pub fn set_user(&mut self, id: Uuid) {
-        self.current_user = id;
     }
 }
 

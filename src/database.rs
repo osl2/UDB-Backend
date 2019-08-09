@@ -1,5 +1,5 @@
 use diesel::r2d2::{self, ConnectionManager};
-use diesel::{Connection, PgConnection, SqliteConnection};
+use diesel::SqliteConnection;
 use serde::Deserialize;
 
 /// The String specifies a filepath or URI for the DB Connection

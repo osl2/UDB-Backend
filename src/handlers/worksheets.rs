@@ -52,7 +52,7 @@ fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error
             for worksheet in query_worksheets {
                 let tasks_query = schema::tasks_in_worksheets::table
                     .filter(schema::tasks_in_worksheets::columns::worksheet_id.eq(&worksheet.id))
-                    .select((schema::tasks_in_worksheets::columns::task_id))
+                    .select(schema::tasks_in_worksheets::columns::task_id)
                     .order(schema::tasks_in_worksheets::position)
                     .load::<String>(&*conn);
                 worksheets.push(models::Worksheet {
@@ -154,7 +154,7 @@ fn get_worksheet(
         Ok(worksheet) => {
             let tasks_query = schema::tasks_in_worksheets::table
                 .filter(schema::tasks_in_worksheets::columns::worksheet_id.eq(format!("{}", id)))
-                .select((schema::tasks_in_worksheets::columns::task_id))
+                .select(schema::tasks_in_worksheets::columns::task_id)
                 .order(schema::tasks_in_worksheets::position)
                 .load::<String>(&*conn);
 

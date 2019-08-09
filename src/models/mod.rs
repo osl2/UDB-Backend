@@ -10,8 +10,8 @@ mod database;
 pub use self::database::Database;
 mod solution;
 pub use self::solution::{
-    Solution, SQLSolution, MCSolution, PlaintextSolution,
-    SolutionResult, SQLSolutionResult, MCSolutionResult, PlaintextSolutionResult,
+    MCSolution, MCSolutionResult, PlaintextSolution, PlaintextSolutionResult, SQLSolution,
+    SQLSolutionResult, Solution, SolutionResult,
 };
 mod subtask;
 pub use self::subtask::Subtask;

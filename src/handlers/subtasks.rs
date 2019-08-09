@@ -1,8 +1,8 @@
 use crate::models;
 use crate::models::SubtasksInTask;
 use crate::schema;
-use crate::AppData;
 use crate::solution_compare::compare_solutions;
+use crate::AppData;
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 use diesel::prelude::*;
 use futures::future::{Future, IntoFuture};
@@ -115,14 +115,14 @@ fn create_subtask(
         Ok(association) => {
             max_position = association.position;
         }
-        Err(e) => {
-            match e {
-                diesel::NotFound => { max_position = -1; },
-                _ => {
-                    return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-                }
+        Err(e) => match e {
+            diesel::NotFound => {
+                max_position = -1;
             }
-        }
+            _ => {
+                return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+            }
+        },
     }
 
     // update task association
@@ -168,15 +168,15 @@ fn get_subtask(
 fn update_subtask(
     req: HttpRequest,
     ids: web::Path<(Uuid, Uuid)>,
-    json: web::Json<models::Subtask>
+    json: web::Json<models::Subtask>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &AppData = req.app_data().unwrap();
 
-    let conn = match appdata.get_db_connection(){
+    let conn = match appdata.get_db_connection() {
         Ok(connection) => connection,
         Err(_) => {
             return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        },
+        }
     };
 
     let query = diesel::update(schema::subtasks::table.find(format!("{}", ids.1)))
@@ -184,12 +184,8 @@ fn update_subtask(
         .execute(&*conn);
 
     match query {
-        Ok(result) => {
-            Box::new(Ok(HttpResponse::Ok().finish()).into_future())
-        },
-        Err(e) => {
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+        Ok(result) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Err(e) => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
     }
 }
 fn delete_subtask(

@@ -53,7 +53,7 @@ fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Er
             for task in query_tasks {
                 let subtasks_query = schema::subtasks_in_tasks::table
                     .filter(schema::subtasks_in_tasks::columns::task_id.eq(&task.id))
-                    .select((schema::subtasks_in_tasks::columns::subtask_id))
+                    .select(schema::subtasks_in_tasks::columns::subtask_id)
                     .order(schema::subtasks_in_tasks::position)
                     .load::<String>(&*conn);
                 tasks.push(models::Task {
@@ -151,7 +151,7 @@ fn get_task(
         Ok(task) => {
             let subtasks_query = schema::subtasks_in_tasks::table
                 .filter(schema::subtasks_in_tasks::columns::task_id.eq(format!("{}", id)))
-                .select((schema::subtasks_in_tasks::columns::subtask_id))
+                .select(schema::subtasks_in_tasks::columns::subtask_id)
                 .order(schema::subtasks_in_tasks::position)
                 .load::<String>(&*conn);
 

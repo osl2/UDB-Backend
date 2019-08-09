@@ -1,5 +1,5 @@
 use crate::models::{
-    Solution, SolutionResult, SQLSolutionResult, MCSolutionResult, PlaintextSolutionResult,
+    MCSolutionResult, PlaintextSolutionResult, SQLSolutionResult, Solution, SolutionResult,
 };
 
 pub fn rows_equal(row1: &Vec<String>, row2: &Vec<String>) -> bool {
@@ -62,7 +62,10 @@ pub fn compare_solutions(student_solution: Solution, teacher_solution: Solution)
                 wrong_rows,
             })
         }
-        (Solution::MultipleChoice(student_solution), Solution::MultipleChoice(teacher_solution)) => {
+        (
+            Solution::MultipleChoice(student_solution),
+            Solution::MultipleChoice(teacher_solution),
+        ) => {
             let mut correct = true;
             let mut wrong_choices: Vec<i64> = Vec::new();
             let mut missed_choices: Vec<i64> = Vec::new();
@@ -96,13 +99,13 @@ pub fn compare_solutions(student_solution: Solution, teacher_solution: Solution)
                 correct_answer: teacher_solution.text.clone(),
             })
         }
-        _ => SolutionResult::Error("Solution types dont match".to_string())  // solution types not the same
+        _ => SolutionResult::Error("Solution types dont match".to_string()), // solution types not the same
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::models::{Solution, SQLSolution};
+    use crate::models::{SQLSolution, Solution};
     use crate::solution_compare;
 
     #[test]
@@ -124,7 +127,7 @@ mod tests {
                 vec!["2".to_string(), "Bob".to_string(), "32".to_string()],
                 vec!["6".to_string(), "Bill".to_string(), "33".to_string()],
                 vec!["3".to_string(), "Charlie".to_string(), "5".to_string()],
-            ]
+            ],
         });
         let solution2 = Solution::SQL(SQLSolution {
             query: "SELECT * FROM users;".to_string(),
@@ -134,7 +137,7 @@ mod tests {
                 vec!["2".to_string(), "Bob".to_string(), "32".to_string()],
                 vec!["3".to_string(), "Charlie".to_string(), "5".to_string()],
                 vec!["4".to_string(), "Dennis".to_string(), "17".to_string()],
-            ]
+            ],
         });
 
         solution_compare::compare_solutions(solution1, solution2);
