@@ -80,53 +80,47 @@ fn create_course(
         }
     };
 
-    // create course object
-    let course = json.into_inner();
-    let course_id = Uuid::new_v4();
-    let new_course = models::QueryableCourse {
-        id: course_id.to_string(),
-        name: course.name,
-        description: course.description,
-    };
+    match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
+        // create course object
+        let course = json.into_inner();
+        let course_id = Uuid::new_v4();
+        let new_course = models::QueryableCourse {
+            id: course_id.to_string(),
+            name: course.name,
+            description: course.description,
+        };
 
-    // insert access for user
-    match diesel::insert_into(schema::access::table)
-        .values(models::Access {
-            user_id: appdata.current_user.to_string(),
-            object_id: course_id.to_string(),
-        })
-        .execute(&*conn)
-    {
-        Ok(result) => {}
-        Err(e) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        }
-    }
-
-    // set worksheets belonging to course
-    for (position, worksheet) in course.worksheets.unwrap().iter().enumerate() {
-        match diesel::insert_into(schema::worksheets_in_courses::table)
-            .values(models::WorksheetsInCourse {
-                worksheet_id: worksheet.to_string(),
-                course_id: course_id.to_string(),
-                position: position as i32,
+        // insert access for user
+        diesel::insert_into(schema::access::table)
+            .values(models::Access {
+                user_id: appdata.current_user.to_string(),
+                object_id: course_id.to_string(),
             })
-            .execute(&*conn)
-        {
-            Ok(result) => {}
-            Err(e) => {
-                return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-            }
-        }
-    }
+            .execute(&*conn)?;
 
-    // insert course object
-    match diesel::insert_into(schema::courses::table)
-        .values(new_course)
-        .execute(&*conn)
-    {
-        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(course_id)).into_future()),
-        Err(e) => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
+        // set worksheets belonging to course
+        for (position, worksheet) in course.worksheets.unwrap().iter().enumerate() {
+            diesel::insert_into(schema::worksheets_in_courses::table)
+                .values(models::WorksheetsInCourse {
+                    worksheet_id: worksheet.to_string(),
+                    course_id: course_id.to_string(),
+                    position: position as i32,
+                })
+                .execute(&*conn)?;
+        }
+
+        // insert course object
+        diesel::insert_into(schema::courses::table)
+            .values(new_course)
+            .execute(&*conn)?;
+
+        Ok(course_id)
+    }) {
+        Ok(course_id) => Box::new(Ok(HttpResponse::Ok().json(course_id)).into_future()),
+        Err(e) => {
+            log::error!("Could not create course: {}", e);
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
     }
 }
 
