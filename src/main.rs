@@ -72,7 +72,6 @@ fn main() {
     let configuration =
         settings::Settings::new(cli_matches.value_of("config").unwrap_or("config.toml")).unwrap();
     let sys = actix::System::new("udb-backend");
-    let prometheus = actix_web_prom::PrometheusMetrics::new("api", "/metrics");
 
     let appstate = AppData::from_configuration(configuration.clone());
     let jwt_key = configuration.jwt_key.clone();
@@ -81,7 +80,7 @@ fn main() {
             .data(appstate.clone())
             .wrap(actix_web::middleware::Logger::default())
             .wrap(Cors::default())
-            .wrap(prometheus.clone())
+            .wrap(actix_web_prom::PrometheusMetrics::new("api", "/metrics"))
             .wrap(middlewares::upload_filter::UploadFilter { filter: false })
             .wrap(JwtAuthentication {
                 key: JwtKey::Inline(jwt_key.clone()),
