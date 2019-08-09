@@ -9,7 +9,7 @@ use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
 
 pub fn get_scope() -> Scope {
-    web::scope("/{task_id}/subtasks")
+    web::scope("/subtasks")
         .service(
             web::resource("")
                 .route(web::get().to_async(get_subtasks))

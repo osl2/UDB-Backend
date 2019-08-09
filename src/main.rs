@@ -94,6 +94,7 @@ fn main() {
                     .service(handlers::databases::get_scope())
                     .service(handlers::worksheets::get_scope())
                     .service(handlers::tasks::get_scope())
+                    .service(handlers::subtasks::get_scope())
                     .service(handlers::alias::get_scope()),
             )
     });

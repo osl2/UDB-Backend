@@ -22,7 +22,6 @@ pub fn get_scope() -> Scope {
                 .route(web::put().to_async(update_task))
                 .route(web::delete().to_async(delete_task)),
         )
-        .service(subtasks::get_scope())
 }
 
 fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
