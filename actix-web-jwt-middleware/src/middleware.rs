@@ -1,25 +1,25 @@
 use actix_web::{dev::{ServiceRequest, ServiceResponse, Service, Transform}, HttpMessage, Error};
 use futures::future::{ok, Either, FutureResult};
-use futures::{Future, Poll};
+use futures::{Poll};
 use lazy_static::lazy_static;
 use regex::Regex;
 use crate::JwtKey;
+use log;
 
 pub use frank_jwt::{Algorithm};
 
-// There are two steps in middleware processing.
-// 1. Middleware initialization, middleware factory gets called with
-//    next service in chain as parameter.
-// 2. Middleware's call method gets called with normal request.
+
+/// JWT based authentication middleware for actix-web
 #[derive(Clone)]
 pub struct JwtAuthentication {
+    /// The keys used for verifying the tokens
     pub key: JwtKey,
+    /// The algorithm used for verifying the tokens
     pub algorithm: Algorithm,
+    /// Regex to match paths that do not need authentication
+    pub except: Regex,
 }
 
-// Middleware factory is `Transform` trait from actix-service crate
-// `S` - type of the next service
-// `B` - type of response's body
 impl<S, B> Transform<S> for JwtAuthentication
 where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
@@ -34,13 +34,14 @@ where
     type Future = FutureResult<Self::Transform, Self::InitError>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(JwtAuthenticationMiddleware { key: self.key.clone(), algorithm: self.algorithm, service: service })
+        ok(JwtAuthenticationMiddleware { key: self.key.clone(), algorithm: self.algorithm, except: self.except.clone(), service: service })
     }
 }
 
 pub struct JwtAuthenticationMiddleware<S> {
     key: JwtKey,
     algorithm: Algorithm,
+    except: Regex,
     service: S,
 }
 
@@ -59,12 +60,14 @@ where
         self.service.poll_ready()
     }
 
-
-
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        let token = match dbg!(get_token(&req)) {
+        if self.except.is_match(req.path()) {
+            return Either::B(self.service.call(req));
+        }
+        let token = match get_token(&req) {
             Ok(token) => token,
             Err(error) => {
+                log::debug!("Could not extract token from request: {}", error);
                 return Either::A(ok(req.into_response(
                     actix_web::HttpResponse::Unauthorized().finish().into_body(),
                 )));
@@ -78,16 +81,31 @@ where
             Ok((header, claims)) => {
                 //TODO: frank_jwt does not validate things yet,
                 //we should either validate things here or patch frank_jwt
-                req.extensions_mut().insert(crate::AuthenticationData(claims))
+                req.extensions_mut().insert(crate::AuthenticationData{
+                    header: header,
+                    claims: crate::Claims {
+                        all: claims.clone(),
+                        sub: match claims {
+                            serde_json::Value::Object(map) => match map.get("sub") {
+                                Some(sub) => match sub {
+                                    serde_json::Value::String(sub) => Some(sub.to_owned()),
+                                    _ => None,
+                                },
+                                _ => None,
+                            },
+                            _ => None,
+                        }
+                    }
+                });
+                Either::B(self.service.call(req))
             }
             Err(error) => {
-                return Either::A(ok(req.into_response(
+                log::debug!("Could not decode token: {}", error);
+                Either::A(ok(req.into_response(
                     actix_web::HttpResponse::Unauthorized().finish().into_body()
-                )));
+                )))
             }
         }
-
-        Either::B(self.service.call(req))
     }
 }
 

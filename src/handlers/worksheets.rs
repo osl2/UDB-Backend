@@ -7,22 +7,19 @@ use diesel::prelude::*;
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
 
-pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
+pub fn get_scope() -> Scope {
     web::scope("/worksheets")
         .service(
             web::resource("")
-                .wrap(auth.clone())
                 .route(web::get().to_async(get_worksheets))
                 .route(web::post().to_async(create_worksheet)),
         )
         .service(
             web::resource("/{id}")
-                .wrap(auth.clone())
                 .route(web::get().to_async(get_worksheet))
                 .route(web::put().to_async(update_worksheet))
                 .route(web::delete().to_async(delete_worksheet)),
         )
-        .service(web::resource("/{id}").route(web::get().to_async(get_worksheet)))
 }
 
 fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {

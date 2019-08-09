@@ -1,7 +1,7 @@
 use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse, Scope};
 use futures::future::{Future, IntoFuture};
 
-pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
+pub fn get_scope() -> Scope {
     web::scope("/account")
         .service(get_account)
         .service(update_account)

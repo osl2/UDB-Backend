@@ -6,6 +6,7 @@ use actix_web::{http::header, web, App, HttpServer};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::SqliteConnection;
 use log::error;
+use regex::Regex;
 use uuid::Uuid;
 
 use actix_web_jwt_middleware::{Algorithm, JwtAuthentication, JwtKey};
@@ -73,11 +74,8 @@ fn main() {
     let sys = actix::System::new("udb-backend");
     let prometheus = actix_web_prom::PrometheusMetrics::new("api", "/metrics");
 
-    let jwt = JwtAuthentication {
-        key: JwtKey::Inline(configuration.jwt_key.clone()),
-        algorithm: Algorithm::HS512,
-    };
     let appstate = AppData::from_configuration(configuration.clone());
+    let jwt_key = configuration.jwt_key.clone();
     let mut server = HttpServer::new(move || {
         App::new()
             .data(appstate.clone())
@@ -85,15 +83,23 @@ fn main() {
             .wrap(Cors::default())
             .wrap(prometheus.clone())
             .wrap(middlewares::upload_filter::UploadFilter { filter: false })
+            .wrap(JwtAuthentication {
+                key: JwtKey::Inline(jwt_key.clone()),
+                algorithm: Algorithm::HS512,
+                except: Regex::new(
+                    r"(?P<uuid>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(/verify)?$",
+                )
+                .unwrap(),
+            })
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(
                 web::scope("/api/v1")
-                    .service(handlers::account::get_scope(jwt.clone()))
-                    .service(handlers::courses::get_scope(jwt.clone()))
-                    .service(handlers::databases::get_scope(jwt.clone()))
-                    .service(handlers::worksheets::get_scope(jwt.clone()))
-                    .service(handlers::tasks::get_scope(jwt.clone()))
-                    .service(handlers::alias::get_scope(jwt.clone())),
+                    .service(handlers::account::get_scope())
+                    .service(handlers::courses::get_scope())
+                    .service(handlers::databases::get_scope())
+                    .service(handlers::worksheets::get_scope())
+                    .service(handlers::tasks::get_scope())
+                    .service(handlers::alias::get_scope()),
             )
     });
     for addr in configuration.listen_addr {

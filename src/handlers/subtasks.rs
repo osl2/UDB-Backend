@@ -8,22 +8,19 @@ use diesel::prelude::*;
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
 
-pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
+pub fn get_scope() -> Scope {
     web::scope("/{task_id}/subtasks")
         .service(
             web::resource("")
-                .wrap(auth.clone())
                 .route(web::get().to_async(get_subtasks))
                 .route(web::post().to_async(create_subtask)),
         )
         .service(
             web::resource("/{id}")
-                .wrap(auth.clone())
                 .route(web::get().to_async(get_subtask))
                 .route(web::put().to_async(update_subtask))
                 .route(web::delete().to_async(delete_subtask)),
         )
-        .service(web::resource("/{id}").route(web::get().to_async(get_subtask)))
         .service(web::resource("/{id}/verify").route(web::post().to_async(verify_subtask_solution)))
 }
 

@@ -7,18 +7,10 @@ use diesel::prelude::*;
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
 
-pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
+pub fn get_scope() -> Scope {
     web::scope("/alias")
-        .service(
-            web::resource("")
-                .wrap(auth.clone())
-                .route(web::post().to_async(create_alias)),
-        )
-        .service(
-            web::resource("/{id}")
-                .wrap(auth.clone())
-                .route(web::get().to_async(get_alias))
-        )
+        .service(web::resource("").route(web::post().to_async(create_alias)))
+        .service(web::resource("/{id}").route(web::get().to_async(get_alias)))
 }
 
 

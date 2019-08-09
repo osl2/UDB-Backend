@@ -9,23 +9,20 @@ use futures::future::{Future, IntoFuture};
 use std::io::SeekFrom::Start;
 use uuid::Uuid;
 
-pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
+pub fn get_scope() -> Scope {
     web::scope("/tasks")
         .service(
             web::resource("")
-                .wrap(auth.clone())
                 .route(web::get().to_async(get_tasks))
                 .route(web::post().to_async(create_task)),
         )
         .service(
             web::resource("/{id}")
-                .wrap(auth.clone())
                 .route(web::get().to_async(get_task))
                 .route(web::put().to_async(update_task))
                 .route(web::delete().to_async(delete_task)),
         )
-        .service(web::resource("/{id}").route(web::get().to_async(get_task)))
-        .service(subtasks::get_scope(auth.clone()))
+        .service(subtasks::get_scope())
 }
 
 fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
