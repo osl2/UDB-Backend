@@ -48,6 +48,70 @@ impl AliasGenerator {
     }
 }
 
+impl Default for AliasGenerator {
+    fn default() -> AliasGenerator {
+        AliasGenerator {
+            words: vec![
+                "database",
+                "table",
+                "column",
+                "row",
+                "integer",
+                "text",
+                "null",
+                "real",
+                "blob",
+                "date",
+                "time",
+                "sqlite",
+                "postgresql",
+                "mariadb",
+                "mysql",
+                "oracle",
+                "nosql",
+                "sql",
+                "select",
+                "from",
+                "where",
+                "join",
+                "group",
+                "values",
+                "order",
+                "limit",
+                "having",
+                "distinct",
+                "all",
+                "with",
+                "recursive",
+                "create",
+                "table",
+                "as",
+                "insert",
+                "into",
+                "replace",
+                "values",
+                "default",
+                "drop",
+                "view",
+                "update",
+                "rollback",
+                "commit",
+                "set",
+                "offset",
+                "abort",
+                "delete",
+                "primary",
+                "foreign",
+                "key",
+                "by",
+            ]
+            .iter()
+            .map(|w| w.to_string())
+            .collect(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::alias_generator::AliasGenerator;

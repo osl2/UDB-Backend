@@ -5,6 +5,7 @@ use crate::AppData;
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 use diesel::prelude::*;
 use futures::future::{Future, IntoFuture};
+use lazy_static::lazy_static;
 
 pub fn get_scope() -> Scope {
     web::scope("/alias")
@@ -26,9 +27,11 @@ fn create_alias(
     };
 
     let alias_req = json.into_inner();
-    let alias_generator = AliasGenerator::from_file("words.txt");
+    lazy_static! {
+        static ref GENERATOR: AliasGenerator = AliasGenerator::default();
+    }
     let mut alias = models::Alias {
-        alias: alias_generator.generate(4),
+        alias: GENERATOR.generate(4),
         object_id: alias_req.object_id,
         object_type: alias_req.object_type,
     };
@@ -50,7 +53,7 @@ fn create_alias(
                 ) => {
                     // Try to find a four word alias for five times, then five words for five times,
                     // then six for five times and then seven for five times.
-                    alias.alias = alias_generator.generate(4 + i / 5);
+                    alias.alias = GENERATOR.generate(4 + i / 5);
                 }
                 e => {
                     log::error!(
