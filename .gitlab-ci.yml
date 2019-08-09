@@ -4,6 +4,10 @@ stages:
   - test
   - build
   - deploy
+  
+cache:
+  paths:
+    - target/
 
 cargo-test:
   stage: test
