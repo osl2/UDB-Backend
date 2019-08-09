@@ -15,5 +15,6 @@ pub struct AuthenticationData {
 
 pub struct Claims {
     sub: Option<String>,
+    exp: Option<i64>,
     all: serde_json::Value,
 }

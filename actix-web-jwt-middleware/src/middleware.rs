@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use crate::JwtKey;
 use log;
+use chrono::{Utc, TimeZone};
 
 pub use frank_jwt::{Algorithm};
 
@@ -34,7 +35,12 @@ where
     type Future = FutureResult<Self::Transform, Self::InitError>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(JwtAuthenticationMiddleware { key: self.key.clone(), algorithm: self.algorithm, except: self.except.clone(), service: service })
+        ok(JwtAuthenticationMiddleware {
+            key: self.key.clone(),
+            algorithm: self.algorithm,
+            except: self.except.clone(),
+            service: service,
+        })
     }
 }
 
@@ -81,11 +87,11 @@ where
             Ok((header, claims)) => {
                 //TODO: frank_jwt does not validate things yet,
                 //we should either validate things here or patch frank_jwt
-                req.extensions_mut().insert(crate::AuthenticationData{
+                let auth_data = crate::AuthenticationData {
                     header: header,
                     claims: crate::Claims {
                         all: claims.clone(),
-                        sub: match claims {
+                        sub: match claims.clone() {
                             serde_json::Value::Object(map) => match map.get("sub") {
                                 Some(sub) => match sub {
                                     serde_json::Value::String(sub) => Some(sub.to_owned()),
@@ -94,9 +100,30 @@ where
                                 _ => None,
                             },
                             _ => None,
+                        },
+                        exp: match claims {
+                            serde_json::Value::Object(map) => match map.get("exp") {
+                                Some(exp) => match exp {
+                                    serde_json::Value::Number(exp) => exp.as_i64(),
+                                    _ => None,
+                                },
+                                _ => None,
+                            },
+                            _ => None,
+                        },
+                    },
+                };
+                match auth_data.claims.exp {
+                    Some(exp) => {
+                        if Utc.timestamp(exp, 0) > Utc::now() {
+                            return Either::A(ok(req.into_response(
+                                actix_web::HttpResponse::Unauthorized().finish().into_body(),
+                            )));
                         }
                     }
-                });
+                    _ => (),
+                }
+                req.extensions_mut().insert(auth_data);
                 Either::B(self.service.call(req))
             }
             Err(error) => {
