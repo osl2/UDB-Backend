@@ -1,14 +1,17 @@
-use actix_web::{dev::{ServiceRequest, ServiceResponse, Service, Transform}, HttpMessage, Error};
-use futures::future::{ok, Either, FutureResult};
-use futures::{Poll};
+use crate::JwtKey;
+use actix_web::{
+    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    Error, HttpMessage,
+};
+use chrono::{TimeZone, Utc};
+use futures::{
+    future::{ok, Either, FutureResult},
+    Poll,
+};
 use lazy_static::lazy_static;
 use regex::Regex;
-use crate::JwtKey;
-use log;
-use chrono::{Utc, TimeZone};
 
-pub use frank_jwt::{Algorithm};
-
+pub use frank_jwt::Algorithm;
 
 /// JWT based authentication middleware for actix-web
 #[derive(Clone)]
@@ -60,7 +63,7 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type Future = futures::future::Either<FutureResult<Self::Response, Self::Error> , S::Future>;
+    type Future = futures::future::Either<FutureResult<Self::Response, Self::Error>, S::Future>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         self.service.poll_ready()
@@ -129,7 +132,7 @@ where
             Err(error) => {
                 log::debug!("Could not decode token: {}", error);
                 Either::A(ok(req.into_response(
-                    actix_web::HttpResponse::Unauthorized().finish().into_body()
+                    actix_web::HttpResponse::Unauthorized().finish().into_body(),
                 )))
             }
         }

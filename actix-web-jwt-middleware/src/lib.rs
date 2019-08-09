@@ -1,5 +1,5 @@
 mod middleware;
-pub use middleware::{JwtAuthentication, Algorithm};
+pub use middleware::{Algorithm, JwtAuthentication};
 use std::path::PathBuf;
 
 #[derive(Clone)]
