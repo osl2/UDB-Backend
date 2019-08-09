@@ -75,7 +75,6 @@ fn main() {
         App::new()
             .data(appstate.clone())
             .wrap(actix_web::middleware::Logger::default())
-            .wrap(Cors::default())
             .wrap(actix_web_prom::PrometheusMetrics::new("api", "/metrics"))
             .wrap(middlewares::upload_filter::UploadFilter { filter: false })
             .wrap(JwtAuthentication {
@@ -86,6 +85,7 @@ fn main() {
                 )
                 .unwrap(),
             })
+            .wrap(Cors::default())
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(
                 web::scope("/api/v1")
