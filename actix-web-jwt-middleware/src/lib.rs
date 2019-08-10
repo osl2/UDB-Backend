@@ -8,4 +8,4 @@ pub enum JwtKey {
     File(PathBuf),
 }
 
-pub struct AuthenticationData(serde_json::Value);
+pub struct AuthenticationData(pub serde_json::Value);

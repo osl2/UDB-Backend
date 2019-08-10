@@ -20,3 +20,5 @@ mod worksheet;
 pub use self::worksheet::{QueryableWorksheet, TasksInWorksheet, Worksheet};
 mod access;
 pub use self::access::Access;
+mod user;
+pub use self::user::User;
