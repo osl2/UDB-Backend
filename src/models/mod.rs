@@ -1,7 +1,5 @@
-mod account_creation;
-pub use self::account_creation::AccountCreation;
-mod account_update;
-pub use self::account_update::AccountUpdate;
+mod account;
+pub use self::account::Account;
 mod content;
 pub use self::content::Content;
 mod course;
@@ -25,3 +23,5 @@ mod access;
 pub use self::access::Access;
 pub mod alias;
 pub use self::alias::{Alias, AliasRequest};
+mod user;
+pub use self::user::User;

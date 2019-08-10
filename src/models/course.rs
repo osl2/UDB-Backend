@@ -10,7 +10,7 @@
 
 use crate::schema::courses;
 use crate::schema::worksheets_in_courses;
-use diesel::prelude::*;
+
 /// Course : The root of the Course type's schema.
 use serde::{Deserialize, Serialize};
 

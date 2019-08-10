@@ -1,5 +1,5 @@
 use crate::schema::aliases;
-use diesel::types::Integer;
+use diesel::sql_types::Integer;
 use diesel::{backend, deserialize, serialize, Insertable, Queryable};
 use serde::{Deserialize, Serialize};
 use std::io::Write;

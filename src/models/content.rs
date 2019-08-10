@@ -11,10 +11,9 @@
 use crate::models::solution::{MCSolution, PlaintextSolution, SQLSolution, Solution};
 use diesel::backend::Backend;
 use diesel::deserialize::FromSql;
-use diesel::expression::AsExpression;
 use diesel::serialize::{IsNull, Output, ToSql};
 use diesel::sql_types::Text;
-use diesel::{deserialize, serialize, IntoSql, Queryable};
+use diesel::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::io::Write;

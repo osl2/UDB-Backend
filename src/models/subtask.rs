@@ -12,7 +12,7 @@ use crate::models::Content;
 use crate::schema::subtasks;
 use diesel::backend;
 use diesel::deserialize;
-use diesel::prelude::*;
+
 use diesel::serialize;
 use diesel::sql_types::Integer;
 use serde::{Deserialize, Serialize};

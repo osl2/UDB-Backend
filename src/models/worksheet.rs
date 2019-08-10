@@ -10,7 +10,7 @@
 
 use crate::schema::tasks_in_worksheets;
 use crate::schema::worksheets;
-use diesel::prelude::*;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
