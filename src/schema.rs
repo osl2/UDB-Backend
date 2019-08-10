@@ -9,7 +9,7 @@ table! {
     aliases (alias) {
         alias -> Text,
         object_id -> Text,
-        object_type -> Nullable<Integer>,
+        object_type -> Integer,
     }
 }
 

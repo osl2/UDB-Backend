@@ -1,5 +1,8 @@
 use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse, Scope};
 use futures::future::{Future, IntoFuture};
+use crate::AppData;
+use crate::models;
+use crate::schema;
 
 pub fn get_scope() -> Scope {
     web::scope("/account")
@@ -15,7 +18,7 @@ fn get_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[put("")]
-fn update_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+fn update_account(req: HttpRequest, json: web::Json<models::AccountUpdate>) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
 }
 #[post("")]

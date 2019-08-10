@@ -42,13 +42,13 @@ where
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct AliasRequest {
     pub object_id: String,
     pub object_type: ObjectType,
 }
 
-#[derive(Debug, Clone, Queryable, Insertable)]
+#[derive(Debug, Clone, Queryable, Insertable, Serialize)]
 #[table_name = "aliases"]
 pub struct Alias {
     pub alias: String,

@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate diesel;
 
-use actix_cors::Cors;
+use actix_cors::{Cors, AllOrSome};
 use actix_web::{web, App, HttpServer};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::SqliteConnection;
