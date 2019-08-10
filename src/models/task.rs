@@ -10,7 +10,7 @@
 
 use crate::schema::subtasks_in_tasks;
 use crate::schema::tasks;
-use diesel::prelude::*;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

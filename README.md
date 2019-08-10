@@ -19,12 +19,12 @@ cargo install
 ```bash
 > upowdb-backend --help
 
-upowdb-backend 0.1.0
+upowdb-backend 0.2.0
 Jan Christian Grünhage <jan.christian@gruenhage.xyz>:David Lamm <david-lamm@web.de>
 
 
 USAGE:
-    udb-back [FLAGS] [OPTIONS]
+    upowdb-backend [FLAGS] [OPTIONS]
 
 FLAGS:
     -h, --help       Prints help information

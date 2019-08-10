@@ -1,0 +1,3 @@
+target
+.git
+actix-web-jwt-middleware/test/target

@@ -6,6 +6,14 @@ table! {
 }
 
 table! {
+    aliases (alias) {
+        alias -> Text,
+        object_id -> Text,
+        object_type -> Integer,
+    }
+}
+
+table! {
     courses (id) {
         id -> Text,
         name -> Text,
@@ -91,6 +99,7 @@ joinable!(worksheets_in_courses -> worksheets (worksheet_id));
 
 allow_tables_to_appear_in_same_query!(
     access,
+    aliases,
     courses,
     databases,
     subtasks,

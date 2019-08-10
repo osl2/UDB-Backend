@@ -1,49 +1,51 @@
 use crate::models;
-use crate::models::SubtasksInTask;
 use crate::schema;
-use crate::AppData;
+use crate::solution_compare::compare_solutions;
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
-use diesel::prelude::*;
+
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
 
-pub fn get_scope(auth: actix_web_jwt_middleware::JwtAuthentication) -> Scope {
-    web::scope("/{task_id}/subtasks")
+use diesel::{
+    r2d2::{self, ConnectionManager},
+    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, SqliteConnection,
+};
+
+pub fn get_scope() -> Scope {
+    web::scope("/subtasks")
         .service(
             web::resource("")
-                .wrap(auth.clone())
                 .route(web::get().to_async(get_subtasks))
                 .route(web::post().to_async(create_subtask)),
         )
         .service(
             web::resource("/{id}")
-                .wrap(auth.clone())
+                .route(web::get().to_async(get_subtask))
                 .route(web::put().to_async(update_subtask))
                 .route(web::delete().to_async(delete_subtask)),
         )
-        .service(web::resource("/{id}").route(web::get().to_async(get_subtask)))
         .service(web::resource("/{id}/verify").route(web::post().to_async(verify_subtask_solution)))
 }
 
-fn get_subtasks(
-    req: HttpRequest,
-    task_id: web::Path<Uuid>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let appdata: &AppData = req.app_data().unwrap();
+fn get_subtasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    let extensions = req.extensions();
+    let conn = extensions
+        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .unwrap();
+    let sub = extensions
+        .get::<actix_web_jwt_middleware::AuthenticationData>()
+        .unwrap()
+        .claims
+        .sub
+        .clone()
+        .unwrap();
 
-    let conn = match appdata.get_db_connection() {
-        Ok(connection) => connection,
-        Err(_) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        }
-    };
-
-    let query = schema::subtasks::table
+    match schema::subtasks::table
         .inner_join(
             schema::access::table
                 .on(schema::subtasks::columns::id.eq(schema::access::columns::object_id)),
         )
-        .filter(schema::access::columns::user_id.eq(appdata.current_user.to_string()))
+        .filter(schema::access::columns::user_id.eq(sub))
         .select((
             schema::subtasks::columns::id,
             schema::subtasks::columns::instruction,
@@ -52,174 +54,152 @@ fn get_subtasks(
             schema::subtasks::allowed_sql,
             schema::subtasks::content,
         ))
-        .load::<models::Subtask>(&*conn);
-
-    match query {
+        .load::<models::Subtask>(&*conn)
+    {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
-        Err(e) => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
+        Err(e) => {
+            log::error!("Couldn't get subtasks: {}", e);
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
     }
 }
 fn create_subtask(
     req: HttpRequest,
-    task_id: web::Path<Uuid>,
     json: web::Json<models::Subtask>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let appdata: &AppData = req.app_data().unwrap();
+    let extensions = req.extensions();
+    let conn = extensions
+        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .unwrap();
+    let sub = extensions
+        .get::<actix_web_jwt_middleware::AuthenticationData>()
+        .unwrap()
+        .claims
+        .sub
+        .clone()
+        .unwrap();
 
-    let conn = match appdata.get_db_connection() {
-        Ok(connection) => connection,
-        Err(_) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        }
-    };
+    match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
+        // create subtask object
+        let mut new_subtask = json.into_inner();
+        let id = Uuid::new_v4();
+        new_subtask.id = id.to_string();
 
-    // create subtask object
-    let mut new_subtask = json.into_inner();
-    let id = Uuid::new_v4();
-    new_subtask.id = id.to_string();
+        // insert access for user
+        diesel::insert_into(schema::access::table)
+            .values(models::Access {
+                user_id: sub,
+                object_id: id.to_string(),
+            })
+            .execute(&*conn)?;
 
-    // get task id
-    let task_id = task_id.into_inner();
+        // insert subtask object
+        diesel::insert_into(schema::subtasks::table)
+            .values(new_subtask)
+            .execute(&*conn)?;
 
-    // insert access for user
-    match diesel::insert_into(schema::access::table)
-        .values(models::Access {
-            user_id: appdata.current_user.to_string(),
-            object_id: id.to_string(),
-        })
-        .execute(&*conn)
-    {
-        Ok(result) => {}
+        Ok(id)
+    }) {
+        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
         Err(e) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+            log::error!("Couldn't create subtask: {}", e);
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
-    }
-
-    // insert subtask object
-    match diesel::insert_into(schema::subtasks::table)
-        .values(new_subtask)
-        .execute(&*conn)
-    {
-        Ok(result) => {}
-        Err(e) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        }
-    }
-
-    // get max position
-    let mut max_position = 0;
-    match schema::subtasks_in_tasks::table
-        .filter(schema::subtasks_in_tasks::task_id.eq(task_id.to_string()))
-        .order(schema::subtasks_in_tasks::position.desc())
-        .get_result::<models::SubtasksInTask>(&*conn)
-    {
-        Ok(association) => {
-            max_position = association.position;
-        }
-        Err(e) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        }
-    }
-
-    // update task association
-    match diesel::insert_into(schema::subtasks_in_tasks::table)
-        .values(SubtasksInTask {
-            task_id: task_id.to_string(),
-            subtask_id: id.to_string(),
-            position: max_position + 1,
-        })
-        .execute(&*conn)
-    {
-        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(id)).into_future()),
-        Err(e) => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
     }
 }
 fn get_subtask(
     req: HttpRequest,
     ids: web::Path<(Uuid, Uuid)>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let appdata: &AppData = req.app_data().unwrap();
+    let extensions = req.extensions();
+    let conn = extensions
+        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .unwrap();
 
-    let conn = match appdata.get_db_connection() {
-        Ok(connection) => connection,
-        Err(_) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        }
-    };
-
-    let query = schema::subtasks::table
+    match schema::subtasks::table
         .find(format!("{}", ids.1))
-        .get_result::<models::Subtask>(&*conn);
-
-    match query {
+        .get_result::<models::Subtask>(&*conn)
+    {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
         Err(e) => match e {
             diesel::result::Error::NotFound => {
                 Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
             }
-            _ => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
+            e => {
+                log::error!("Couldn't get subtask: {}", e);
+                Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            }
         },
     }
 }
 fn update_subtask(
     req: HttpRequest,
-    ids: web::Path<(Uuid, Uuid)>,
+    id: web::Path<Uuid>,
+    json: web::Json<models::Subtask>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().finish()).into_future())
+    let extensions = req.extensions();
+    let conn = extensions
+        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .unwrap();
+
+    match diesel::update(schema::subtasks::table.find(id.into_inner().to_string()))
+        .set(json.into_inner())
+        .execute(&*conn)
+    {
+        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Err(e) => {
+            log::error!("Couldn't update subtask: {}", e);
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
+    }
 }
 fn delete_subtask(
     req: HttpRequest,
-    ids: web::Path<(Uuid, Uuid)>,
+    id: web::Path<Uuid>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let appdata: &AppData = req.app_data().unwrap();
+    let extensions = req.extensions();
+    let conn = extensions
+        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .unwrap();
 
-    let conn = match appdata.get_db_connection() {
-        Ok(connection) => connection,
-        Err(_) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        }
-    };
+    let subtask_id = id.into_inner();
 
-    let task_id = ids.0;
-    let subtask_id = ids.1;
+    match conn.transaction::<(), diesel::result::Error, _>(|| {
+        // delete subtask
+        diesel::delete(schema::subtasks::table.find(subtask_id.to_string())).execute(&*conn)?;
 
-    // delete subtask
-    let query =
-        diesel::delete(schema::subtasks::table.find(subtask_id.to_string())).execute(&*conn);
-    match query {
-        Ok(result) => {}
+        // delete task associations
+        diesel::delete(
+            schema::subtasks_in_tasks::table
+                .filter(schema::subtasks_in_tasks::subtask_id.eq(subtask_id.to_string())),
+        )
+        .execute(&*conn)?;
+
+        // delete access
+        diesel::delete(
+            schema::access::table.filter(schema::access::object_id.eq(subtask_id.to_string())),
+        )
+        .execute(&*conn)?;
+        Ok(())
+    }) {
+        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
+            log::error!("Couldn't delete subtask: {}", e);
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
-    }
-
-    // delete task associations
-    match diesel::delete(
-        schema::subtasks_in_tasks::table
-            .filter(schema::subtasks_in_tasks::subtask_id.eq(subtask_id.to_string())),
-    )
-    .execute(&*conn)
-    {
-        Ok(result) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
-        Err(e) => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
     }
 }
 fn verify_subtask_solution(
     req: HttpRequest,
-    ids: web::Path<(Uuid, Uuid)>,
+    id: web::Path<Uuid>,
     json: web::Json<models::Solution>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let appdata: &AppData = req.app_data().unwrap();
+    let extensions = req.extensions();
+    let conn = extensions
+        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .unwrap();
 
-    let conn = match appdata.get_db_connection() {
-        Ok(connection) => connection,
-        Err(_) => {
-            return Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future());
-        }
-    };
-
-    let task_id = ids.0;
-    let subtask_id = ids.1;
+    let subtask_id = id.into_inner();
 
     // get student solution
     let student_solution = json.into_inner();
@@ -234,9 +214,16 @@ fn verify_subtask_solution(
                 // this subtask does not have a public solution
                 return Box::new(Ok(HttpResponse::NotFound().finish()).into_future());
             }
-            // TODO: compare solutions
-            Box::new(Ok(HttpResponse::Ok().json(false)).into_future())
+
+            let teacher_solution = subtask.content.unwrap().get_solution().unwrap();
+
+            let result = compare_solutions(student_solution, teacher_solution);
+
+            Box::new(Ok(HttpResponse::Ok().json(result)).into_future())
         }
-        Err(e) => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
+        Err(e) => {
+            log::error!("Couldn't compare solution: {}", e);
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
     }
 }

@@ -12,7 +12,7 @@ use crate::models::Content;
 use crate::schema::subtasks;
 use diesel::backend;
 use diesel::deserialize;
-use diesel::prelude::*;
+
 use diesel::serialize;
 use diesel::sql_types::Integer;
 use serde::{Deserialize, Serialize};
@@ -50,7 +50,7 @@ where
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, AsChangeset)]
 pub struct Subtask {
     #[serde(rename = "id")]
     pub id: String,

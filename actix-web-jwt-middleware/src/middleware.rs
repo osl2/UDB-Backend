@@ -1,25 +1,29 @@
-use actix_web::{dev::{ServiceRequest, ServiceResponse, Service, Transform}, HttpMessage, Error};
-use futures::future::{ok, Either, FutureResult};
-use futures::{Future, Poll};
+use crate::JwtKey;
+use actix_web::{
+    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    Error, HttpMessage,
+    http::Method,
+};
+use chrono::{TimeZone, Utc};
+use futures::{
+    future::{ok, Either, FutureResult},
+    Poll,
+};
 use lazy_static::lazy_static;
 use regex::Regex;
-use crate::JwtKey;
+pub use frank_jwt::Algorithm;
 
-pub use frank_jwt::{Algorithm};
-
-// There are two steps in middleware processing.
-// 1. Middleware initialization, middleware factory gets called with
-//    next service in chain as parameter.
-// 2. Middleware's call method gets called with normal request.
+/// JWT based authentication middleware for actix-web
 #[derive(Clone)]
 pub struct JwtAuthentication {
+    /// The keys used for verifying the tokens
     pub key: JwtKey,
+    /// The algorithm used for verifying the tokens
     pub algorithm: Algorithm,
+    /// Regexes to match paths and a list of methods on those that do not need authentication
+    pub except: Vec<(Regex, Vec<Method>)>,
 }
 
-// Middleware factory is `Transform` trait from actix-service crate
-// `S` - type of the next service
-// `B` - type of response's body
 impl<S, B> Transform<S> for JwtAuthentication
 where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
@@ -34,13 +38,19 @@ where
     type Future = FutureResult<Self::Transform, Self::InitError>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(JwtAuthenticationMiddleware { key: self.key.clone(), algorithm: self.algorithm, service: service })
+        ok(JwtAuthenticationMiddleware {
+            key: self.key.clone(),
+            algorithm: self.algorithm,
+            except: self.except.clone(),
+            service: service,
+        })
     }
 }
 
 pub struct JwtAuthenticationMiddleware<S> {
     key: JwtKey,
     algorithm: Algorithm,
+    except: Vec<(Regex, Vec<Method>)>,
     service: S,
 }
 
@@ -53,18 +63,22 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type Future = futures::future::Either<FutureResult<Self::Response, Self::Error> , S::Future>;
+    type Future = futures::future::Either<FutureResult<Self::Response, Self::Error>, S::Future>;
 
     fn poll_ready(&mut self) -> Poll<(), Self::Error> {
         self.service.poll_ready()
     }
 
-
-
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        let token = match dbg!(get_token(&req)) {
+        for (reg, methods) in self.except.clone() {
+            if reg.is_match(req.path()) && methods.contains(req.method()) {
+                return Either::B(self.service.call(req));
+            }
+        }
+        let token = match get_token(&req) {
             Ok(token) => token,
             Err(error) => {
+                log::debug!("Could not extract token from request: {}", error);
                 return Either::A(ok(req.into_response(
                     actix_web::HttpResponse::Unauthorized().finish().into_body(),
                 )));
@@ -78,16 +92,52 @@ where
             Ok((header, claims)) => {
                 //TODO: frank_jwt does not validate things yet,
                 //we should either validate things here or patch frank_jwt
-                req.extensions_mut().insert(crate::AuthenticationData(claims))
+                let auth_data = crate::AuthenticationData {
+                    header: header,
+                    claims: crate::Claims {
+                        all: claims.clone(),
+                        sub: match claims.clone() {
+                            serde_json::Value::Object(map) => match map.get("sub") {
+                                Some(sub) => match sub {
+                                    serde_json::Value::String(sub) => Some(sub.to_owned()),
+                                    _ => None,
+                                },
+                                _ => None,
+                            },
+                            _ => None,
+                        },
+                        exp: match claims {
+                            serde_json::Value::Object(map) => match map.get("exp") {
+                                Some(exp) => match exp {
+                                    serde_json::Value::Number(exp) => exp.as_i64(),
+                                    _ => None,
+                                },
+                                _ => None,
+                            },
+                            _ => None,
+                        },
+                    },
+                };
+                match auth_data.claims.exp {
+                    Some(exp) => {
+                        if Utc.timestamp(exp, 0) > Utc::now() {
+                            return Either::A(ok(req.into_response(
+                                actix_web::HttpResponse::Unauthorized().finish().into_body(),
+                            )));
+                        }
+                    }
+                    _ => (),
+                }
+                req.extensions_mut().insert(auth_data);
+                Either::B(self.service.call(req))
             }
             Err(error) => {
-                return Either::A(ok(req.into_response(
-                    actix_web::HttpResponse::Unauthorized().finish().into_body()
-                )));
+                log::debug!("Could not decode token: {}", error);
+                Either::A(ok(req.into_response(
+                    actix_web::HttpResponse::Unauthorized().finish().into_body(),
+                )))
             }
         }
-
-        Either::B(self.service.call(req))
     }
 }
 
