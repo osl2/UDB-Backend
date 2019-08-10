@@ -2,6 +2,7 @@ use crate::JwtKey;
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage,
+    http::Method,
 };
 use chrono::{TimeZone, Utc};
 use futures::{
@@ -10,7 +11,6 @@ use futures::{
 };
 use lazy_static::lazy_static;
 use regex::Regex;
-
 pub use frank_jwt::Algorithm;
 
 /// JWT based authentication middleware for actix-web
@@ -20,8 +20,8 @@ pub struct JwtAuthentication {
     pub key: JwtKey,
     /// The algorithm used for verifying the tokens
     pub algorithm: Algorithm,
-    /// Regex to match paths that do not need authentication
-    pub except: Regex,
+    /// Regexes to match paths and a list of methods on those that do not need authentication
+    pub except: Vec<(Regex, Vec<Method>)>,
 }
 
 impl<S, B> Transform<S> for JwtAuthentication
@@ -50,7 +50,7 @@ where
 pub struct JwtAuthenticationMiddleware<S> {
     key: JwtKey,
     algorithm: Algorithm,
-    except: Regex,
+    except: Vec<(Regex, Vec<Method>)>,
     service: S,
 }
 
@@ -70,8 +70,10 @@ where
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        if self.except.is_match(req.path()) {
-            return Either::B(self.service.call(req));
+        for (reg, methods) in self.except.clone() {
+            if reg.is_match(req.path()) && methods.contains(req.method()) {
+                return Either::B(self.service.call(req));
+            }
         }
         let token = match get_token(&req) {
             Ok(token) => token,

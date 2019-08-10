@@ -9,12 +9,12 @@ pub enum JwtKey {
 }
 
 pub struct AuthenticationData {
-    header: serde_json::Value,
-    claims: Claims,
+    pub header: serde_json::Value,
+    pub claims: Claims,
 }
 
 pub struct Claims {
-    sub: Option<String>,
-    exp: Option<i64>,
-    all: serde_json::Value,
+    pub sub: Option<String>,
+    pub exp: Option<i64>,
+    pub all: serde_json::Value,
 }

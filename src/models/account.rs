@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AccountCreation {
+pub struct Account {
     #[serde(rename = "username")]
     pub username: String,
     #[serde(rename = "password")]

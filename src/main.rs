@@ -80,14 +80,31 @@ fn main() {
             .data(appstate.clone())
             .wrap(actix_web::middleware::Logger::default())
             .wrap(actix_web_prom::PrometheusMetrics::new("api", "/metrics"))
+            .wrap(middlewares::ownership::OwnershipChecker{})
             .wrap(middlewares::upload_filter::UploadFilter { filter: false })
             .wrap(JwtAuthentication {
                 key: JwtKey::Inline(jwt_key.clone()),
                 algorithm: Algorithm::HS512,
-                except: Regex::new(
-                    r"(?P<uuid>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(/verify)?$",
-                )
-                .unwrap(),
+                except: vec![(
+                    Regex::new(
+                        r"(?P<uuid>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+                    )
+                    .unwrap(),
+                    vec![Method::GET],
+                ),(
+                    Regex::new(
+                        r"/subtasks/(?P<uuid>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/verify$",
+                    )
+                    .unwrap(),
+                    vec![Method::POST],
+                ),(
+                    #[allow(clippy::trivial_regex)]
+                    Regex::new(
+                        r"/account",
+                    )
+                    .unwrap(),
+                    vec![Method::GET, Method::POST, Method::PUT, Method::DELETE],
+                )],
             })
             .wrap(Cors::default())
             .wrap(middlewares::db_connection::DatabaseConnection {
