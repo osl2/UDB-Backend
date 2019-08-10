@@ -78,9 +78,8 @@ fn main() {
     let mut server = HttpServer::new(move || {
         App::new()
             .data(appstate.clone())
-            .wrap(actix_web::middleware::Logger::default())
-            .wrap(actix_web_prom::PrometheusMetrics::new("api", "/metrics"))
             .wrap(middlewares::ownership::OwnershipChecker{})
+            .wrap(Cors::default())
             .wrap(middlewares::upload_filter::UploadFilter { filter: false })
             .wrap(JwtAuthentication {
                 key: JwtKey::Inline(jwt_key.clone()),
@@ -106,10 +105,11 @@ fn main() {
                     vec![Method::GET, Method::POST, Method::PUT, Method::DELETE],
                 )],
             })
-            .wrap(Cors::default())
             .wrap(middlewares::db_connection::DatabaseConnection {
                 pool: appstate.clone().db_connection_pool.unwrap(),
             })
+            .wrap(actix_web::middleware::Logger::default())
+            .wrap(actix_web_prom::PrometheusMetrics::new("api", "/metrics"))
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(
                 web::scope("/api/v1")
