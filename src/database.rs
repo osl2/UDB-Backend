@@ -10,10 +10,6 @@ pub enum DatabaseConnectionConfig {
     SQLiteFile { file: String },
     #[serde(rename = "memory")]
     SQLiteInMemory,
-    #[serde(rename = "postgres")]
-    Postgres { uri: String },
-    #[serde(rename = "mysql")]
-    MySQL { uri: String },
 }
 
 impl DatabaseConnectionConfig {
@@ -26,7 +22,11 @@ impl DatabaseConnectionConfig {
                     .build(ConnectionManager::<SqliteConnection>::new(file.clone()))
                     .expect("Failed to create database connection Pool."),
             ),
-            _ => None,
+            DatabaseConnectionConfig::SQLiteInMemory => Some(
+                r2d2::Pool::builder()
+                    .build(ConnectionManager::<SqliteConnection>::new(":memory:"))
+                    .expect("Failed to create database connection Pooll."),
+            ),
         }
     }
 }
