@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 actix-service = "0.4.1"
-actix-web = "1.0.0"
-futures = "0.1.25"
+actix-web = "1.0.5"
+futures = "0.1.28"
 actix-web-jwt-middleware = { path = ".." }
 env_logger = "0.6.2"
