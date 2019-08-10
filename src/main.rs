@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate diesel;
 
-use actix_cors::{Cors, AllOrSome};
-use actix_web::{web, App, HttpServer};
+use actix_cors::Cors;
+use actix_web::{http::Method, web, App, HttpServer};
 use diesel::r2d2::{self, ConnectionManager};
 use diesel::SqliteConnection;
 use log::error;
@@ -38,22 +38,6 @@ impl AppData {
             current_user: Uuid::parse_str("549b60cd-9b88-467b-9b1e-b15c68114c96").unwrap(), // test user
         }
     }
-
-    pub fn get_db_connection(
-        &self,
-    ) -> Result<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>, ()> {
-        match &self.db_connection_pool {
-            Some(pool) => match pool.get() {
-                Ok(connection) => Ok(connection),
-                Err(e) => Err(()),
-            },
-            None => Err(()),
-        }
-    }
-
-    pub fn get_user(&self) -> Uuid {
-        self.current_user
-    }
 }
 
 fn main() {
@@ -70,6 +54,7 @@ fn main() {
     let sys = actix::System::new("udb-backend");
 
     let appstate = AppData::from_configuration(configuration.clone());
+
     if appstate.db_connection_pool.is_none() {
         log::error!("Couldn't connect to database!");
         return;
