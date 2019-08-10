@@ -70,6 +70,10 @@ fn main() {
     let sys = actix::System::new("udb-backend");
 
     let appstate = AppData::from_configuration(configuration.clone());
+    if appstate.db_connection_pool.is_none() {
+        log::error!("Couldn't connect to database!");
+        return;
+    }
     let jwt_key = configuration.jwt_key.clone();
     let mut server = HttpServer::new(move || {
         App::new()
@@ -86,6 +90,9 @@ fn main() {
                 .unwrap(),
             })
             .wrap(Cors::default())
+            .wrap(middlewares::db_connection::DatabaseConnection {
+                pool: appstate.clone().db_connection_pool.unwrap(),
+            })
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(
                 web::scope("/api/v1")
