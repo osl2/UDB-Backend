@@ -2,7 +2,7 @@ use crate::models::{
     MCSolutionResult, PlaintextSolutionResult, SQLSolutionResult, Solution, SolutionResult,
 };
 
-pub fn rows_equal(row1: &Vec<String>, row2: &Vec<String>) -> bool {
+pub fn rows_equal(row1: &[String], row2: &[String]) -> bool {
     if row1.len() != row2.len() {
         return false;
     }
@@ -39,20 +39,18 @@ pub fn compare_solutions(student_solution: Solution, teacher_solution: Solution)
                 }
             }
 
-            // find rows in teacher solution that student missed
+            // find rows in teacher solution that the student missed
             let mut i = 0;
             for (index, teacher_row) in teacher_solution.rows.iter().enumerate() {
                 if visited_teacher_rows.len() <= i {
                     missed_rows.push(teacher_row.clone());
+                } else if index == visited_teacher_rows[i] {
+                    // skip row if already found pair in previous loop.
+                    // we know that indices in visited_teacher_rows are in order,
+                    // so the next one is the next index coming up
+                    i += 1;
                 } else {
-                    if index == visited_teacher_rows[i] {
-                        // skip row if already found pair in previous loop.
-                        // we know that indices in visited_teacher_rows are in order,
-                        // so the next one is the next index coming up
-                        i += 1;
-                    } else {
-                        missed_rows.push(teacher_row.clone());
-                    }
+                    missed_rows.push(teacher_row.clone());
                 }
             }
 
