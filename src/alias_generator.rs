@@ -7,27 +7,20 @@ use std::io::{BufRead, BufReader};
 pub struct AliasGenerator {
     words: Vec<String>,
 }
-
+#[allow(dead_code)]
 impl AliasGenerator {
     pub fn new() -> Self {
         Self { words: Vec::new() }
     }
 
-    pub fn from_file(filename: &str) -> Self {
+    pub fn from_file(filename: &str) -> std::io::Result<Self> {
         let mut words = Vec::new();
-        match File::open(filename) {
-            Ok(file) => {
-                let reader = BufReader::new(file);
-                for line in reader.lines() {
-                    match line {
-                        Ok(word) => words.push(word),
-                        Err(e) => {}
-                    }
-                }
-            }
-            Err(e) => {}
+        let file = File::open(filename)?;
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            words.push(line?);
         }
-        Self { words }
+        Ok(Self { words })
     }
 
     pub fn add_words<'a>(&'a mut self, mut words: Vec<String>) -> &'a mut Self {
@@ -38,10 +31,9 @@ impl AliasGenerator {
     pub fn generate(&self, n_words: usize) -> String {
         let mut chosen = Vec::new();
         let mut rng = thread_rng();
-        for i in 0..n_words {
-            match self.words.as_slice().choose(&mut rng) {
-                Some(word) => chosen.push(word.clone()),
-                None => {}
+        for _ in 0..n_words {
+            if let Some(word) = self.words.as_slice().choose(&mut rng) {
+                chosen.push(word.clone());
             }
         }
         chosen.join("-")
