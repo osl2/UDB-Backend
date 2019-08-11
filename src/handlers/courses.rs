@@ -32,13 +32,20 @@ fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
         .unwrap();
+    let current_user = extensions
+        .get::<actix_web_jwt_middleware::AuthenticationData>()
+        .unwrap()
+        .claims
+        .sub
+        .clone()
+        .unwrap();
 
     let query = schema::courses::table
         .inner_join(
             schema::access::table
                 .on(schema::courses::columns::id.eq(schema::access::columns::object_id)),
         )
-        .filter(schema::access::columns::user_id.eq(appdata.current_user.to_string()))
+        .filter(schema::access::columns::user_id.eq(current_user))
         .select((
             schema::courses::columns::id,
             schema::courses::columns::name,
