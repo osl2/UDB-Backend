@@ -96,7 +96,7 @@ pub fn create_database(
 
         Ok(id)
     }) {
-        Ok(id) => Box::new(Ok(HttpResponse::Ok().json(id)).into_future()),
+        Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
         Err(e) => {
             log::error!("Couldn't create database: {}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())

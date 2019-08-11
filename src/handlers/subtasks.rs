@@ -100,7 +100,7 @@ fn create_subtask(
 
         Ok(id)
     }) {
-        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
+        Ok(result) => Box::new(Ok(HttpResponse::Ok().body(result.to_string())).into_future()),
         Err(e) => {
             log::error!("Couldn't create subtask: {}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())

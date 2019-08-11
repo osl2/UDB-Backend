@@ -123,7 +123,7 @@ fn create_course(
 
         Ok(course_id)
     }) {
-        Ok(course_id) => Box::new(Ok(HttpResponse::Ok().json(course_id)).into_future()),
+        Ok(course_id) => Box::new(Ok(HttpResponse::Ok().body(course_id.to_string())).into_future()),
         Err(e) => {
             log::error!("Could not create course: {}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())

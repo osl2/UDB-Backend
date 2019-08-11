@@ -129,7 +129,7 @@ fn create_worksheet(
 
         Ok(worksheet_id)
     }) {
-        Ok(id) => Box::new(Ok(HttpResponse::Ok().json(id)).into_future()),
+        Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
         Err(e) => {
             log::error!("Couldn't create worksheet: {}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
