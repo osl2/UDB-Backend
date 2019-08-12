@@ -7,7 +7,6 @@ use diesel::r2d2::{self, ConnectionManager};
 use diesel::SqliteConnection;
 use log::error;
 use regex::Regex;
-use uuid::Uuid;
 
 use actix_web_jwt_middleware::{Algorithm, JwtAuthentication, JwtKey};
 
@@ -34,7 +33,6 @@ impl AppData {
         Self {
             settings: config,
             db_connection_pool: pool,
-            current_user: Uuid::parse_str("549b60cd-9b88-467b-9b1e-b15c68114c96").unwrap(), // test user
         }
     }
 }
