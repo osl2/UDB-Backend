@@ -97,9 +97,11 @@ fn main() {
                 let cors = if let Some(host) = appstate.clone().settings.allowed_frontend {
                     cors.allowed_origin(&host)
                 } else {
-                    cors
+                    cors.allowed_origin("*")
                 };
-                cors.allowed_methods(&[Method::GET, Method::POST, Method::PUT, Method::DELETE])
+                cors
+                    .allowed_methods(&[Method::GET, Method::POST, Method::PUT, Method::DELETE])
+                    .max_age(3600)
             })
             .wrap(actix_web::middleware::Logger::default())
             .wrap(actix_web_prom::PrometheusMetrics::new("api", "/metrics"))
