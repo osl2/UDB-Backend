@@ -80,6 +80,13 @@ fn main() {
                     )
                     .unwrap(),
                     vec![Method::GET, Method::POST, Method::PUT, Method::DELETE],
+                ),(
+                    #[allow(clippy::trivial_regex)]
+                    Regex::new(
+                        r"/alias",
+                    )
+                    .unwrap(),
+                    vec![Method::GET],
                 )],
             })
             .wrap(middlewares::db_connection::DatabaseConnection {
