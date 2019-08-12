@@ -1,7 +1,6 @@
 use crate::models;
 use crate::models::WorksheetsInCourse;
 use crate::schema;
-use crate::AppData;
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 use diesel::{
     prelude::*,
@@ -27,7 +26,6 @@ pub fn get_scope() -> Scope {
 }
 
 fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let appdata: &AppData = req.app_data().unwrap();
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()

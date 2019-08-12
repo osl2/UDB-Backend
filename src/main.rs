@@ -3,8 +3,6 @@ extern crate diesel;
 
 use actix_cors::Cors;
 use actix_web::{http::Method, web, App, HttpServer};
-use diesel::r2d2::{self, ConnectionManager};
-use diesel::SqliteConnection;
 use log::error;
 use regex::Regex;
 
@@ -25,16 +23,11 @@ mod solution_compare;
 #[derive(Clone)]
 struct AppData {
     settings: settings::Settings,
-    db_connection_pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl AppData {
     pub fn from_configuration(config: settings::Settings) -> Self {
-        let pool = config.db_connection.create_sqlite_connection_pool();
-        Self {
-            settings: config,
-            db_connection_pool: pool,
-        }
+        Self { settings: config }
     }
 }
 
@@ -91,7 +84,7 @@ fn main() {
                 )],
             })
             .wrap(middlewares::db_connection::DatabaseConnection {
-                pool: appstate.clone().db_connection_pool,
+                pool: appstate.clone().settings.db_connection.create_sqlite_connection_pool(),
             })
             .wrap({
                 let cors = Cors::new();
