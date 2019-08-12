@@ -10,7 +10,7 @@ pub struct Settings {
     pub(crate) listen_addr: Vec<std::net::SocketAddr>,
     pub(crate) trusted_proxies: Option<Vec<std::net::IpAddr>>,
     pub(crate) db_connection: DatabaseConnectionConfig,
-    pub(crate) allowed_frontend: String,
+    pub(crate) allowed_frontend: Option<String>,
 }
 
 impl Settings {
