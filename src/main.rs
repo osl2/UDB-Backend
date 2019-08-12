@@ -92,15 +92,7 @@ fn main() {
             .wrap(middlewares::db_connection::DatabaseConnection {
                 pool: appstate.clone().db_connection_pool,
             })
-            .wrap({
-                let cors = Cors::new();
-                let cors = if let Some(host) = appstate.clone().settings.allowed_frontend {
-                    cors.allowed_origin(&host)
-                } else {
-                    cors
-                };
-                cors.allowed_methods(&[Method::GET, Method::POST, Method::PUT, Method::DELETE])
-            })
+            .wrap(Cors::default())
             .wrap(actix_web::middleware::Logger::default())
             .wrap(actix_web_prom::PrometheusMetrics::new("api", "/metrics"))
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
