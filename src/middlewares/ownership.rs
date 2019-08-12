@@ -90,7 +90,7 @@ where
                         }
                         _ => Err(OwnershipCheckerError::Undefined),
                     }
-                },
+                }
                 _ => Ok(()),
             }
         };
