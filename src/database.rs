@@ -13,20 +13,17 @@ pub enum DatabaseConnectionConfig {
 }
 
 impl DatabaseConnectionConfig {
-    pub fn create_sqlite_connection_pool(
-        &self,
-    ) -> Option<r2d2::Pool<ConnectionManager<SqliteConnection>>> {
+    pub fn create_sqlite_connection_pool(&self) -> r2d2::Pool<ConnectionManager<SqliteConnection>> {
         match self {
-            DatabaseConnectionConfig::SQLiteFile { file } => Some(
-                r2d2::Pool::builder()
-                    .build(ConnectionManager::<SqliteConnection>::new(file.clone()))
-                    .expect("Failed to create database connection Pool."),
-            ),
-            DatabaseConnectionConfig::SQLiteInMemory => Some(
-                r2d2::Pool::builder()
-                    .build(ConnectionManager::<SqliteConnection>::new(":memory:"))
-                    .expect("Failed to create database connection Pooll."),
-            ),
+            DatabaseConnectionConfig::SQLiteFile { file } => sqlite(&file.clone()),
+            DatabaseConnectionConfig::SQLiteInMemory => sqlite(":memory:"),
         }
     }
+}
+
+fn sqlite(file: &str) -> r2d2::Pool<ConnectionManager<SqliteConnection>> {
+    r2d2::Pool::builder()
+        .max_size(15)
+        .build(ConnectionManager::<SqliteConnection>::new(file))
+        .expect("Failed to create database connection Pool.")
 }

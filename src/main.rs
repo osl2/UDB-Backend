@@ -25,8 +25,7 @@ mod solution_compare;
 #[derive(Clone)]
 struct AppData {
     settings: settings::Settings,
-    db_connection_pool: Option<r2d2::Pool<ConnectionManager<SqliteConnection>>>,
-    current_user: Uuid,
+    db_connection_pool: r2d2::Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl AppData {
@@ -55,10 +54,6 @@ fn main() {
 
     let appstate = AppData::from_configuration(configuration.clone());
 
-    if appstate.db_connection_pool.is_none() {
-        log::error!("Couldn't connect to database!");
-        return;
-    }
     let jwt_key = configuration.jwt_key.clone();
     let mut server = HttpServer::new(move || {
         App::new()
@@ -90,7 +85,7 @@ fn main() {
                 )],
             })
             .wrap(middlewares::db_connection::DatabaseConnection {
-                pool: appstate.clone().db_connection_pool.unwrap(),
+                pool: appstate.clone().db_connection_pool,
             })
             .wrap(Cors::default())
             .wrap(actix_web::middleware::Logger::default())
