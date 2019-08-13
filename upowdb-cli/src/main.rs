@@ -17,13 +17,13 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
     let sql_subtask = models::Subtask {
         id: "".to_string(),
-        allowed_sql: models::AllowedSQL::ALL,
         instruction: "select all genres".to_string(),
         is_solution_verifiable: false,
         is_solution_visible: false,
-        content: Some(models::Content::SQL {
+        content: models::Content::SQL {
             row_order_matters: false,
-            solution: models::SQLSolution {
+            allowed_sql: models::AllowedSQL::ALL,
+            solution: Some(models::SQLSolution {
                 query: "".to_string(),
                 columns: vec!["Name".to_string()],
                 rows: vec![
@@ -54,36 +54,33 @@ fn main() -> Result<(), Box<std::error::Error>> {
                     vec!["Opera".to_string(),],
                 ]
 
-            }
-        })
+            })
+        }
     };
     let instruction_subtask = models::Subtask {
         id: "".to_string(),
-        allowed_sql: models::AllowedSQL::ALL,
         instruction: "this will instruct you to do something".to_string(),
         is_solution_verifiable: false,
         is_solution_visible: false,
-        content: Some(models::Content::Instruction),
+        content: models::Content::Instruction,
     };
     let plain_subtask = models::Subtask {
         id: "".to_string(),
-        allowed_sql: models::AllowedSQL::ALL,
         instruction: "What color is #00FF00".to_string(),
         is_solution_verifiable: false,
         is_solution_visible: false,
-        content: Some(models::Content::Plaintext {
-            solution: models::PlaintextSolution {
+        content: models::Content::Plaintext {
+            solution: Some(models::PlaintextSolution {
                 text: "Green".to_string()
-            }
-        })
+            })
+        }
     };
     let multiple_choice_subtask = models::Subtask {
         id: "".to_string(),
-        allowed_sql: models::AllowedSQL::ALL,
         instruction: "Who made these tasks?".to_string(),
         is_solution_verifiable: false,
         is_solution_visible: false,
-        content: Some(models::Content::MC {
+        content: models::Content::MC {
             answer_options: vec![
                 "Lisa".to_string(),
                 "David".to_string(),
@@ -91,10 +88,10 @@ fn main() -> Result<(), Box<std::error::Error>> {
                 "Grüntier".to_string(),
                 "Svenja".to_string(),
             ],
-            solution: models::MCSolution {
+            solution: Some(models::MCSolution {
                 correct_positions: vec![3i64]
-            }
-        })
+            })
+        }
     };
     let mut subtask_ids : Vec<String> = vec![];
 
@@ -105,19 +102,19 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("{:?}", subtask_ids);
 
     let task = models::Task {
-        database_id: "a11be729-d7ec-458c-bd24-ade940aabe5d".to_string(),
+        database_id: "02ea5d3f-4f0f-41c2-a610-bb7badab6b84".to_string(),
         id: "".to_string(),
-        subtasks: Some(subtask_ids),
+        subtasks: subtask_ids,
     };
 
     let task_id = client.post("https://api.staging.upowdb.xyz/api/v1/tasks").json(&task).send()?.text()?;
 
     let worksheet = models::Worksheet {
         id: "".to_string(),
-        is_online: false,
-        is_solution_online: false,
+        is_online: true,
+        is_solution_online: true,
         name: Some("testsheet".to_string()),
-        tasks: Some(vec![task_id]),
+        tasks: vec![task_id],
 
     };
 
@@ -127,7 +124,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
         id: "".to_string(),
         name: "testcourse".to_string(),
         description: Some("description of this course".to_string()),
-        worksheets: Some(vec![worksheet_id]),
+        worksheets: vec![worksheet_id],
     };
 
     let course_id = client.post("https://api.staging.upowdb.xyz/api/v1/courses").json(&course).send()?.text()?;

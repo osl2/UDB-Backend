@@ -64,7 +64,7 @@ fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
                     id: course.id,
                     name: course.name,
                     description: course.description,
-                    worksheets: worksheets_query.ok(),
+                    worksheets: worksheets_query.unwrap(),
                 });
             }
             Box::new(Ok(HttpResponse::Ok().json(courses)).into_future())
@@ -111,7 +111,7 @@ fn create_course(
             .execute(&*conn)?;
 
         // set worksheets belonging to course
-        for (position, worksheet) in course.worksheets.unwrap().iter().enumerate() {
+        for (position, worksheet) in course.worksheets.iter().enumerate() {
             diesel::insert_into(schema::worksheets_in_courses::table)
                 .values(models::WorksheetsInCourse {
                     worksheet_id: worksheet.to_string(),
@@ -161,7 +161,7 @@ fn get_course(
                     id: course.id,
                     name: course.name,
                     description: course.description,
-                    worksheets: worksheets_query.ok(),
+                    worksheets: worksheets_query.unwrap(),
                 }))
                 .into_future(),
             )
@@ -208,7 +208,6 @@ fn update_course(
         let course_id = course.id.clone();
         let worksheets_in_course: Vec<WorksheetsInCourse> = course
             .worksheets
-            .unwrap()
             .iter()
             .map(|worksheet_id| {
                 pos += 1;

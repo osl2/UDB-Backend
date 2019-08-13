@@ -51,7 +51,6 @@ fn get_subtasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error =
             schema::subtasks::columns::instruction,
             schema::subtasks::is_solution_visible,
             schema::subtasks::is_solution_verifiable,
-            schema::subtasks::allowed_sql,
             schema::subtasks::content,
         ))
         .load::<models::Subtask>(&*conn)
@@ -215,7 +214,7 @@ fn verify_subtask_solution(
                 return Box::new(Ok(HttpResponse::NotFound().finish()).into_future());
             }
 
-            let teacher_solution = subtask.content.unwrap().get_solution().unwrap();
+            let teacher_solution = subtask.content.get_solution().unwrap();
 
             let result = compare_solutions(student_solution, teacher_solution);
 

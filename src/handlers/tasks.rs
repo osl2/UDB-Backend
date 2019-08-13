@@ -60,7 +60,7 @@ fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Er
                 tasks.push(models::Task {
                     id: task.id,
                     database_id: task.database_id,
-                    subtasks: subtasks_query.ok(),
+                    subtasks: subtasks_query.unwrap(),
                 });
             }
             Box::new(Ok(HttpResponse::Ok().json(tasks)).into_future())
@@ -106,7 +106,7 @@ fn create_task(
             .execute(&*conn)?;
 
         // set subtasks belonging to task
-        for (position, subtask_id) in task.subtasks.unwrap().iter().enumerate() {
+        for (position, subtask_id) in task.subtasks.iter().enumerate() {
             diesel::insert_into(schema::subtasks_in_tasks::table)
                 .values(models::SubtasksInTask {
                     subtask_id: subtask_id.to_string(),
@@ -155,7 +155,7 @@ fn get_task(
                 Ok(HttpResponse::Ok().json(models::Task {
                     id: task.id,
                     database_id: task.database_id,
-                    subtasks: subtasks_query.ok(),
+                    subtasks: subtasks_query.unwrap(),
                 }))
                 .into_future(),
             )
@@ -200,7 +200,6 @@ fn update_task(
         let task_id = task.id.clone();
         let subtasks_in_task: Vec<models::SubtasksInTask> = task
             .subtasks
-            .unwrap()
             .iter()
             .map(|subtask_id| {
                 pos += 1;

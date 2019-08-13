@@ -35,8 +35,7 @@ table! {
         instruction -> Text,
         is_solution_verifiable -> Bool,
         is_solution_visible -> Bool,
-        allowed_sql -> Integer,
-        content -> Nullable<Text>,
+        content -> Text,
     }
 }
 
