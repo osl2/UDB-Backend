@@ -9,6 +9,9 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
     let client = reqwest::Client::builder().default_headers(headers.clone()).build()?;
 
+    dbg!(client.post("https://api.staging.upowdb.xyz/api/v1/account/register")
+    .json(&models::Account {username: username.to_string(), password: password.to_string()}).send()?);
+
     let token : serde_json::Value = serde_json::from_str(&dbg!(client.post("https://api.staging.upowdb.xyz/api/v1/account/login")
         .basic_auth(username, Some(password)).send()?.text()?))?;
     let token = token["token"].as_str().unwrap();
