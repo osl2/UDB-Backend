@@ -109,7 +109,7 @@ fn create_subtask(
 }
 fn get_subtask(
     req: HttpRequest,
-    ids: web::Path<(Uuid, Uuid)>,
+    id: web::Path<Uuid>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
@@ -117,7 +117,7 @@ fn get_subtask(
         .unwrap();
 
     match schema::subtasks::table
-        .find(format!("{}", ids.1))
+        .find(format!("{}", id))
         .get_result::<models::Subtask>(&*conn)
     {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
