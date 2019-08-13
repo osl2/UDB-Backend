@@ -1,6 +1,6 @@
 use crate::models;
 use crate::schema;
-use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
+use actix_web::{web, Error, FromRequest, HttpRequest, HttpResponse, Scope};
 
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
@@ -11,14 +11,19 @@ use diesel::{
 };
 
 pub fn get_scope() -> Scope {
+    let json_config = web::Json::<models::Database>::configure(|cfg| {
+        cfg.limit(4194304) //4MB limit
+    });
     web::scope("/databases")
         .service(
             web::resource("")
+                .data(json_config.clone())
                 .route(web::get().to_async(get_databases))
                 .route(web::post().to_async(create_database)),
         )
         .service(
             web::resource("/{id}")
+                .data(json_config.clone())
                 .route(web::get().to_async(get_database))
                 .route(web::put().to_async(update_database))
                 .route(web::delete().to_async(delete_database)),
