@@ -1,6 +1,4 @@
-#[macro_use]
-extern crate diesel;
-
+#![warn(unused_extern_crates)]
 use actix_cors::Cors;
 use actix_web::{http::Method, web, App, HttpServer};
 use log::error;
@@ -8,14 +6,14 @@ use regex::Regex;
 
 use actix_web_jwt_middleware::{Algorithm, JwtAuthentication, JwtKey};
 
+pub use upowdb_models::{models, schema};
+
 mod alias_generator;
 mod cli;
 mod database;
 mod handlers;
 mod logging;
 mod middlewares;
-mod models;
-mod schema;
 mod settings;
 mod solution_compare;
 
