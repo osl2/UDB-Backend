@@ -51,7 +51,6 @@ fn get_subtasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error =
             schema::subtasks::columns::instruction,
             schema::subtasks::is_solution_visible,
             schema::subtasks::is_solution_verifiable,
-            schema::subtasks::allowed_sql,
             schema::subtasks::content,
         ))
         .load::<models::Subtask>(&*conn)
@@ -100,7 +99,7 @@ fn create_subtask(
 
         Ok(id)
     }) {
-        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
+        Ok(result) => Box::new(Ok(HttpResponse::Ok().body(result.to_string())).into_future()),
         Err(e) => {
             log::error!("Couldn't create subtask: {}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
@@ -109,7 +108,7 @@ fn create_subtask(
 }
 fn get_subtask(
     req: HttpRequest,
-    ids: web::Path<(Uuid, Uuid)>,
+    id: web::Path<Uuid>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
@@ -117,7 +116,7 @@ fn get_subtask(
         .unwrap();
 
     match schema::subtasks::table
-        .find(format!("{}", ids.1))
+        .find(format!("{}", id))
         .get_result::<models::Subtask>(&*conn)
     {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
@@ -215,7 +214,7 @@ fn verify_subtask_solution(
                 return Box::new(Ok(HttpResponse::NotFound().finish()).into_future());
             }
 
-            let teacher_solution = subtask.content.unwrap().get_solution().unwrap();
+            let teacher_solution = subtask.content.get_solution().unwrap();
 
             let result = compare_solutions(student_solution, teacher_solution);
 

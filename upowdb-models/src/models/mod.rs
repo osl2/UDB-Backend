@@ -12,7 +12,7 @@ pub use self::solution::{
     SQLSolutionResult, Solution, SolutionResult,
 };
 mod subtask;
-pub use self::subtask::Subtask;
+pub use self::subtask::{Subtask, AllowedSQL};
 mod task;
 pub use self::task::{QueryableTask, SubtasksInTask, Task};
 mod token;
@@ -22,6 +22,6 @@ pub use self::worksheet::{QueryableWorksheet, TasksInWorksheet, Worksheet};
 mod access;
 pub use self::access::Access;
 pub mod alias;
-pub use self::alias::{Alias, AliasRequest};
+pub use self::alias::{Alias, AliasRequest, ObjectType};
 mod user;
 pub use self::user::User;

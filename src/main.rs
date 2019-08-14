@@ -1,15 +1,12 @@
-#[macro_use]
-extern crate diesel;
-
+#![warn(unused_extern_crates)]
 use actix_cors::Cors;
 use actix_web::{http::Method, web, App, HttpServer};
-use diesel::r2d2::{self, ConnectionManager};
-use diesel::SqliteConnection;
 use log::error;
 use regex::Regex;
-use uuid::Uuid;
 
 use actix_web_jwt_middleware::{Algorithm, JwtAuthentication, JwtKey};
+
+pub use upowdb_models::{models, schema};
 
 mod alias_generator;
 mod cli;
@@ -17,26 +14,17 @@ mod database;
 mod handlers;
 mod logging;
 mod middlewares;
-mod models;
-mod schema;
 mod settings;
 mod solution_compare;
 
 #[derive(Clone)]
 struct AppData {
     settings: settings::Settings,
-    db_connection_pool: Option<r2d2::Pool<ConnectionManager<SqliteConnection>>>,
-    current_user: Uuid,
 }
 
 impl AppData {
     pub fn from_configuration(config: settings::Settings) -> Self {
-        let pool = config.db_connection.create_sqlite_connection_pool();
-        Self {
-            settings: config,
-            db_connection_pool: pool,
-            current_user: Uuid::parse_str("549b60cd-9b88-467b-9b1e-b15c68114c96").unwrap(), // test user
-        }
+        Self { settings: config }
     }
 }
 
@@ -55,10 +43,6 @@ fn main() {
 
     let appstate = AppData::from_configuration(configuration.clone());
 
-    if appstate.db_connection_pool.is_none() {
-        log::error!("Couldn't connect to database!");
-        return;
-    }
     let jwt_key = configuration.jwt_key.clone();
     let mut server = HttpServer::new(move || {
         App::new()
@@ -87,10 +71,29 @@ fn main() {
                     )
                     .unwrap(),
                     vec![Method::GET, Method::POST, Method::PUT, Method::DELETE],
+                ),(
+                    #[allow(clippy::trivial_regex)]
+                    Regex::new(
+                        r"/alias",
+                    )
+                    .unwrap(),
+                    vec![Method::GET],
                 )],
             })
             .wrap(middlewares::db_connection::DatabaseConnection {
-                pool: appstate.clone().db_connection_pool.unwrap(),
+                pool: appstate.clone().settings.db_connection.create_sqlite_connection_pool(),
+            })
+            .wrap({
+                let cors = Cors::new();
+                let cors = if let Some(host) = appstate.clone().settings.allowed_frontend {
+                    cors.allowed_origin(&host)
+                } else {
+                    cors
+                };
+                cors
+                    .allowed_methods(&[Method::GET, Method::POST, Method::PUT, Method::DELETE])
+                    .supports_credentials()
+                    .max_age(3600)
             })
             .wrap(Cors::default())
             .wrap(actix_web::middleware::Logger::default())

@@ -1,0 +1,13 @@
+[package]
+name = "upowdb-cli"
+version = "0.1.0"
+authors = ["Jan Christian Gr??nhage <jan.christian@gruenhage.xyz>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+upowdb-models = { path = "../upowdb-models" }
+serde_json = "1.0.40"
+reqwest = "0.9.19"

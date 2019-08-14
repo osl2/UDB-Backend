@@ -63,7 +63,7 @@ fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error
                 name: worksheet.name,
                 is_online: worksheet.is_online,
                 is_solution_online: worksheet.is_solution_online,
-                tasks: tasks_query.ok(),
+                tasks: tasks_query.unwrap(),
             });
         }
         Ok(worksheets)
@@ -112,7 +112,7 @@ fn create_worksheet(
             .execute(&*conn)?;
 
         // set tasks belonging to worksheet
-        for (position, task_id) in worksheet.tasks.unwrap().iter().enumerate() {
+        for (position, task_id) in worksheet.tasks.iter().enumerate() {
             diesel::insert_into(schema::tasks_in_worksheets::table)
                 .values(models::TasksInWorksheet {
                     task_id: task_id.to_string(),
@@ -129,7 +129,7 @@ fn create_worksheet(
 
         Ok(worksheet_id)
     }) {
-        Ok(id) => Box::new(Ok(HttpResponse::Ok().json(id)).into_future()),
+        Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
         Err(e) => {
             log::error!("Couldn't create worksheet: {}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
@@ -162,7 +162,7 @@ fn get_worksheet(
             name: worksheet.name,
             is_online: worksheet.is_online,
             is_solution_online: worksheet.is_solution_online,
-            tasks: tasks_query.ok(),
+            tasks: tasks_query.unwrap(),
         })
     }) {
         Ok(sheet) => Box::new(Ok(HttpResponse::Ok().json(sheet)).into_future()),
@@ -208,7 +208,6 @@ fn update_worksheet(
         let worksheet_id = worksheet.id.clone();
         let tasks_in_worksheet: Vec<TasksInWorksheet> = worksheet
             .tasks
-            .unwrap()
             .iter()
             .map(|task_id| {
                 pos += 1;

@@ -62,18 +62,32 @@ where
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        match self.pool.get() {
-            Ok(pooled_conn) => {
-                req.extensions_mut().insert(pooled_conn);
-                Either::A(self.service.call(req))
+        let mut i = 0;
+        loop {
+            i += 1;
+            match self.pool.get() {
+                Ok(pooled_conn) => {
+                    req.extensions_mut().insert(pooled_conn);
+                    return Either::A(self.service.call(req));
+                }
+                Err(e) => {
+                    log::error!(
+                        "Database connection is broken{}: {}",
+                        if i >= 5 {
+                            ", returning an error"
+                        } else {
+                            ", trying again"
+                        },
+                        e
+                    );
+                }
             }
-            Err(e) => {
-                log::error!("Database connection is broken: {}", e);
-                Either::B(ok(req.into_response(
+            if i >= 5 {
+                return Either::B(ok(req.into_response(
                     actix_web::HttpResponse::InternalServerError()
                         .finish()
                         .into_body(),
-                )))
+                )));
             }
         }
     }

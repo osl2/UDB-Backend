@@ -63,7 +63,7 @@ fn create_alias(
         }
         Err(AliasError::NoFreeAliases)
     }) {
-        Ok(alias) => Box::new(Ok(HttpResponse::Ok().json(alias)).into_future()),
+        Ok(alias) => Box::new(Ok(HttpResponse::Ok().body(alias)).into_future()),
         Err(e) => match e {
             AliasError::Diesel(e) => {
                 log::error!("Couldn't create new alias: {}", e);

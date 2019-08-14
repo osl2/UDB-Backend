@@ -66,10 +66,10 @@ where
                 extensions.get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>();
             let token = extensions.get::<actix_web_jwt_middleware::AuthenticationData>();
 
-            match (conn, token, id) {
-                (Some(conn), Some(token), Some(id)) => {
-                    match req.method().as_str() {
-                        "PUT" | "DELETE" => {
+            match req.method().as_str() {
+                "PUT" | "DELETE" => {
+                    match (conn, token, id) {
+                        (Some(conn), Some(token), Some(id)) => {
                             // Check whether the user has access to the object
                             schema::access::table
                                 .filter(schema::access::object_id.eq(id.as_str().to_string()))
@@ -88,10 +88,10 @@ where
                                 })
                                 .map(|_| ())
                         }
-                        _ => Ok(()),
+                        _ => Err(OwnershipCheckerError::Undefined),
                     }
                 }
-                _ => Err(OwnershipCheckerError::Undefined),
+                _ => Ok(()),
             }
         };
 

@@ -1,7 +1,6 @@
 use crate::models;
 use crate::models::WorksheetsInCourse;
 use crate::schema;
-use crate::AppData;
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 use diesel::{
     prelude::*,
@@ -27,10 +26,16 @@ pub fn get_scope() -> Scope {
 }
 
 fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let appdata: &AppData = req.app_data().unwrap();
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .unwrap();
+    let current_user = extensions
+        .get::<actix_web_jwt_middleware::AuthenticationData>()
+        .unwrap()
+        .claims
+        .sub
+        .clone()
         .unwrap();
 
     let query = schema::courses::table
@@ -38,7 +43,7 @@ fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
             schema::access::table
                 .on(schema::courses::columns::id.eq(schema::access::columns::object_id)),
         )
-        .filter(schema::access::columns::user_id.eq(appdata.current_user.to_string()))
+        .filter(schema::access::columns::user_id.eq(current_user))
         .select((
             schema::courses::columns::id,
             schema::courses::columns::name,
@@ -59,7 +64,7 @@ fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
                     id: course.id,
                     name: course.name,
                     description: course.description,
-                    worksheets: worksheets_query.ok(),
+                    worksheets: worksheets_query.unwrap(),
                 });
             }
             Box::new(Ok(HttpResponse::Ok().json(courses)).into_future())
@@ -106,7 +111,7 @@ fn create_course(
             .execute(&*conn)?;
 
         // set worksheets belonging to course
-        for (position, worksheet) in course.worksheets.unwrap().iter().enumerate() {
+        for (position, worksheet) in course.worksheets.iter().enumerate() {
             diesel::insert_into(schema::worksheets_in_courses::table)
                 .values(models::WorksheetsInCourse {
                     worksheet_id: worksheet.to_string(),
@@ -123,7 +128,7 @@ fn create_course(
 
         Ok(course_id)
     }) {
-        Ok(course_id) => Box::new(Ok(HttpResponse::Ok().json(course_id)).into_future()),
+        Ok(course_id) => Box::new(Ok(HttpResponse::Ok().body(course_id.to_string())).into_future()),
         Err(e) => {
             log::error!("Could not create course: {}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
@@ -156,7 +161,7 @@ fn get_course(
                     id: course.id,
                     name: course.name,
                     description: course.description,
-                    worksheets: worksheets_query.ok(),
+                    worksheets: worksheets_query.unwrap(),
                 }))
                 .into_future(),
             )
@@ -203,7 +208,6 @@ fn update_course(
         let course_id = course.id.clone();
         let worksheets_in_course: Vec<WorksheetsInCourse> = course
             .worksheets
-            .unwrap()
             .iter()
             .map(|worksheet_id| {
                 pos += 1;
