@@ -24,6 +24,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
         is_solution_verifiable: false,
         is_solution_visible: false,
         content: models::Content::SQL {
+            is_point_and_click_allowed: true,
             row_order_matters: false,
             allowed_sql: models::AllowedSQL::ALL,
             solution: Some(models::SQLSolution {
@@ -105,7 +106,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("{:?}", subtask_ids);
 
     let task = models::Task {
-        database_id: "02ea5d3f-4f0f-41c2-a610-bb7badab6b84".to_string(),
+        database_id: "eef5b7b0-7c28-4856-a9ae-3959fcc5b988".to_string(),
         id: "".to_string(),
         subtasks: subtask_ids,
     };

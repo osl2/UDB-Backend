@@ -13,6 +13,7 @@ use std::io::Write;
 pub enum Content {
     #[serde(rename = "sql")]
     SQL {
+        is_point_and_click_allowed: bool,
         row_order_matters: bool,
         #[serde(rename = "allowed_sql")]
         allowed_sql: AllowedSQL,
