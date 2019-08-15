@@ -1,28 +1,30 @@
 use upowdb_models::models;
 
 fn main() -> Result<(), Box<std::error::Error>> {
+    let origin = "https://upowdb.xyz";
+    let basepath = "https://api.upowdb.xyz/api/v1";
     let username = "elite_admin";
     let password = "2342";
 
     let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert(reqwest::header::ORIGIN, reqwest::header::HeaderValue::from_str("https://staging.upowdb.xyz")?);
+    headers.insert(reqwest::header::ORIGIN, reqwest::header::HeaderValue::from_str(origin)?);
 
     let client = reqwest::Client::builder().default_headers(headers.clone()).build()?;
 
-    dbg!(client.post("https://api.staging.upowdb.xyz/api/v1/account/register")
+    dbg!(client.post(&format!("{}/account/register", basepath))
     .json(&models::Account {username: username.to_string(), password: password.to_string()}).send()?);
 
-    let token : serde_json::Value = serde_json::from_str(&dbg!(client.post("https://api.staging.upowdb.xyz/api/v1/account/login")
+    let token : serde_json::Value = serde_json::from_str(&dbg!(client.post(&format!("{}/account/login", basepath))
         .basic_auth(username, Some(password)).send()?.text()?))?;
     let token = token["token"].as_str().unwrap();
-    headers.insert(reqwest::header::AUTHORIZATION, reqwest::header::HeaderValue::from_str(&format!("Bearer {}", dbg!(token)))?);
+    headers.insert(reqwest::header::AUTHORIZATION, reqwest::header::HeaderValue::from_str(&&format!("Bearer {}", dbg!(token)))?);
     let client = reqwest::Client::builder().default_headers(headers).build()?;
 
     let sql_subtask = models::Subtask {
         id: "".to_string(),
         instruction: "select all genres".to_string(),
-        is_solution_verifiable: false,
-        is_solution_visible: false,
+        is_solution_verifiable: true,
+        is_solution_visible: true,
         content: models::Content::SQL {
             is_point_and_click_allowed: true,
             row_order_matters: false,
@@ -71,8 +73,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
     let plain_subtask = models::Subtask {
         id: "".to_string(),
         instruction: "What color is #00FF00".to_string(),
-        is_solution_verifiable: false,
-        is_solution_visible: false,
+        is_solution_verifiable: true,
+        is_solution_visible: true,
         content: models::Content::Plaintext {
             solution: Some(models::PlaintextSolution {
                 text: "Green".to_string()
@@ -82,8 +84,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
     let multiple_choice_subtask = models::Subtask {
         id: "".to_string(),
         instruction: "Who made these tasks?".to_string(),
-        is_solution_verifiable: false,
-        is_solution_visible: false,
+        is_solution_verifiable: true,
+        is_solution_visible: true,
         content: models::Content::MC {
             answer_options: vec![
                 "Lisa".to_string(),
@@ -99,19 +101,19 @@ fn main() -> Result<(), Box<std::error::Error>> {
     };
     let mut subtask_ids : Vec<String> = vec![];
 
-    subtask_ids.push(dbg!(client.post("https://api.staging.upowdb.xyz/api/v1/subtasks").json(&sql_subtask).send()?).text()?);
-    subtask_ids.push(dbg!(client.post("https://api.staging.upowdb.xyz/api/v1/subtasks").json(&instruction_subtask).send()?).text()?);
-    subtask_ids.push(dbg!(client.post("https://api.staging.upowdb.xyz/api/v1/subtasks").json(&plain_subtask).send()?).text()?);
-    subtask_ids.push(dbg!(client.post("https://api.staging.upowdb.xyz/api/v1/subtasks").json(&multiple_choice_subtask).send()?).text()?);
+    subtask_ids.push(dbg!(client.post(&format!("{}/subtasks", basepath)).json(&sql_subtask).send()?).text()?);
+    subtask_ids.push(dbg!(client.post(&format!("{}/subtasks", basepath)).json(&instruction_subtask).send()?).text()?);
+    subtask_ids.push(dbg!(client.post(&format!("{}/subtasks", basepath)).json(&plain_subtask).send()?).text()?);
+    subtask_ids.push(dbg!(client.post(&format!("{}/subtasks", basepath)).json(&multiple_choice_subtask).send()?).text()?);
     println!("{:?}", subtask_ids);
 
     let task = models::Task {
-        database_id: "eef5b7b0-7c28-4856-a9ae-3959fcc5b988".to_string(),
+        database_id: "005acaf8-c14e-41e2-b977-1b229f61b2d9".to_string(),
         id: "".to_string(),
         subtasks: subtask_ids,
     };
 
-    let task_id = client.post("https://api.staging.upowdb.xyz/api/v1/tasks").json(&task).send()?.text()?;
+    let task_id = client.post(&format!("{}/tasks", basepath)).json(&task).send()?.text()?;
 
     let worksheet = models::Worksheet {
         id: "".to_string(),
@@ -122,7 +124,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
     };
 
-    let worksheet_id = client.post("https://api.staging.upowdb.xyz/api/v1/worksheets").json(&worksheet).send()?.text()?;
+    let worksheet_id = client.post(&format!("{}/worksheets", basepath)).json(&worksheet).send()?.text()?;
 
     let course = models::Course {
         id: "".to_string(),
@@ -131,14 +133,14 @@ fn main() -> Result<(), Box<std::error::Error>> {
         worksheets: vec![worksheet_id],
     };
 
-    let course_id = client.post("https://api.staging.upowdb.xyz/api/v1/courses").json(&course).send()?.text()?;
+    let course_id = client.post(&format!("{}/courses", basepath)).json(&course).send()?.text()?;
 
     let alias_req = models::AliasRequest {
         object_id: course_id,
         object_type: models::ObjectType::COURSE,
     };
 
-    let alias = client.post("https://api.staging.upowdb.xyz/api/v1/alias").json(&alias_req).send()?.text()?;
+    let alias = client.post(&format!("{}/alias", basepath)).json(&alias_req).send()?.text()?;
 
     println!("{}", alias);
     Ok(())
