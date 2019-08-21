@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use diesel::{
     r2d2::{self, ConnectionManager},
-    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, SqliteConnection,
+    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, PgConnection,
 };
 
 pub fn get_scope() -> Scope {
@@ -33,7 +33,7 @@ pub fn get_scope() -> Scope {
 pub fn get_databases(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -70,7 +70,7 @@ pub fn create_database(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -115,7 +115,7 @@ pub fn get_database(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match schema::databases::table
@@ -142,7 +142,7 @@ pub fn update_database(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match diesel::update(schema::databases::table.find(format!("{}", id)))
@@ -163,7 +163,7 @@ pub fn delete_database(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match diesel::delete(schema::databases::table.find(format!("{}", id.into_inner())))

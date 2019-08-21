@@ -27,7 +27,7 @@ pub fn get_scope() -> Scope {
 fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -82,7 +82,7 @@ fn create_worksheet(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -143,7 +143,7 @@ fn get_worksheet(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match conn.transaction::<models::Worksheet, diesel::result::Error, _>(|| {
@@ -185,7 +185,7 @@ fn update_worksheet(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match conn.transaction::<(), diesel::result::Error, _>(|| {
@@ -240,7 +240,7 @@ fn delete_worksheet(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match conn.transaction::<(), diesel::result::Error, _>(|| {

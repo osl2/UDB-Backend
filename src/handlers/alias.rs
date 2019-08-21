@@ -4,7 +4,7 @@ use crate::schema;
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 use diesel::{
     r2d2::{self, ConnectionManager},
-    sqlite::SqliteConnection,
+    pg::PgConnection,
     Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
 };
 use futures::future::{Future, IntoFuture};
@@ -24,7 +24,7 @@ fn create_alias(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match conn.transaction::<String, AliasError, _>(|| {
@@ -94,7 +94,7 @@ fn get_alias(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match schema::aliases::table
@@ -115,7 +115,7 @@ fn get_uuid(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match schema::aliases::table

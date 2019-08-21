@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use diesel::{
     r2d2::{self, ConnectionManager},
-    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, SqliteConnection,
+    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, PgConnection,
 };
 pub fn get_scope() -> Scope {
     web::scope("/tasks")
@@ -27,7 +27,7 @@ pub fn get_scope() -> Scope {
 fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -78,7 +78,7 @@ fn create_task(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -137,7 +137,7 @@ fn get_task(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match schema::tasks::table
@@ -179,7 +179,7 @@ fn update_task(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     match conn.transaction::<(), diesel::result::Error, _>(|| {
@@ -231,7 +231,7 @@ fn delete_task(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>()
         .unwrap();
 
     let uuid = id.into_inner();

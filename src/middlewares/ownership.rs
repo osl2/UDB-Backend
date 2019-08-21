@@ -5,7 +5,7 @@ use actix_web::{
 };
 use diesel::{
     r2d2::{self, ConnectionManager},
-    ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection,
+    ExpressionMethods, QueryDsl, RunQueryDsl, PgConnection,
 };
 use futures::{
     future::{ok, Either, FutureResult},
@@ -63,7 +63,7 @@ where
         let result = {
             let extensions = req.extensions();
             let conn =
-                extensions.get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>();
+                extensions.get::<r2d2::PooledConnection<ConnectionManager<PgConnection>>>();
             let token = extensions.get::<actix_web_jwt_middleware::AuthenticationData>();
 
             match req.method().as_str() {

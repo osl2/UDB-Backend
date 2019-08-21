@@ -81,7 +81,7 @@ fn main() {
                 )],
             })
             .wrap(middlewares::db_connection::DatabaseConnection {
-                pool: appstate.clone().settings.db_connection.create_sqlite_connection_pool(),
+                pool: appstate.clone().settings.db_connection.create_pg_connection_pool(),
             })
             .wrap({
                 let cors = Cors::new();

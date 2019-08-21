@@ -1,29 +1,29 @@
 use diesel::r2d2::{self, ConnectionManager};
-use diesel::SqliteConnection;
+use diesel::PgConnection;
 use serde::Deserialize;
 
 /// The String specifies a filepath or URI for the DB Connection
 #[derive(Deserialize, Debug, Clone)]
 #[serde(tag = "type")]
 pub enum DatabaseConnectionConfig {
-    #[serde(rename = "sqlite")]
-    SQLiteFile { file: String },
+    #[serde(rename = "pg")]
+    PgFile { file: String },
     #[serde(rename = "memory")]
-    SQLiteInMemory,
+    PgInMemory,
 }
 
 impl DatabaseConnectionConfig {
-    pub fn create_sqlite_connection_pool(&self) -> r2d2::Pool<ConnectionManager<SqliteConnection>> {
+    pub fn create_pg_connection_pool(&self) -> r2d2::Pool<ConnectionManager<PgConnection>> {
         match self {
-            DatabaseConnectionConfig::SQLiteFile { file } => sqlite(&file.clone()),
-            DatabaseConnectionConfig::SQLiteInMemory => sqlite(":memory:"),
+            DatabaseConnectionConfig::PgFile { file } => pg(&file.clone()),
+            DatabaseConnectionConfig::PgInMemory => pg(":memory:"),
         }
     }
 }
 
-fn sqlite(file: &str) -> r2d2::Pool<ConnectionManager<SqliteConnection>> {
+fn pg(file: &str) -> r2d2::Pool<ConnectionManager<PgConnection>> {
     r2d2::Pool::builder()
-        .max_size(15)
-        .build(ConnectionManager::<SqliteConnection>::new(file))
+        .max_size(20)
+        .build(ConnectionManager::<PgConnection>::new(file))
         .expect("Failed to create database connection Pool.")
 }
