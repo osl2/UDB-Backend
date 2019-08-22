@@ -11,7 +11,7 @@ use diesel::{
 
 pub fn get_scope() -> Scope {
     let json_config = web::Json::<models::Database>::configure(|cfg| {
-        cfg.limit(4194304) //4MB limit
+        cfg.limit(4*(1024usize.pow(2))) //4MB limit
     });
     web::scope("/databases")
         .service(
