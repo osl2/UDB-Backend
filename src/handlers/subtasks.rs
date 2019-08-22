@@ -1,6 +1,4 @@
-use crate::models;
-use crate::schema;
-use crate::solution_compare::compare_solutions;
+use crate::{models, schema, solution_compare::compare_solutions, database::DatabaseConnection};
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 
 use futures::future::{Future, IntoFuture};
@@ -8,7 +6,7 @@ use uuid::Uuid;
 
 use diesel::{
     r2d2::{self, ConnectionManager},
-    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, SqliteConnection,
+    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl,
 };
 
 pub fn get_scope() -> Scope {
@@ -30,7 +28,7 @@ pub fn get_scope() -> Scope {
 fn get_subtasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -68,7 +66,7 @@ fn create_subtask(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -112,7 +110,7 @@ fn get_subtask(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match schema::subtasks::table
@@ -138,7 +136,7 @@ fn update_subtask(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match diesel::update(schema::subtasks::table.find(id.into_inner().to_string()))
@@ -158,7 +156,7 @@ fn delete_subtask(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     let subtask_id = id.into_inner();
@@ -195,7 +193,7 @@ fn verify_subtask_solution(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     let subtask_id = id.into_inner();

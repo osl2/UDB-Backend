@@ -1,5 +1,4 @@
-use crate::models;
-use crate::schema;
+use crate::{models, schema, database::DatabaseConnection};
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 
 use futures::future::{Future, IntoFuture};
@@ -7,7 +6,7 @@ use uuid::Uuid;
 
 use diesel::{
     r2d2::{self, ConnectionManager},
-    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, SqliteConnection,
+    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl,
 };
 pub fn get_scope() -> Scope {
     web::scope("/tasks")
@@ -27,7 +26,7 @@ pub fn get_scope() -> Scope {
 fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -78,7 +77,7 @@ fn create_task(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -137,7 +136,7 @@ fn get_task(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match schema::tasks::table
@@ -179,7 +178,7 @@ fn update_task(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match conn.transaction::<(), diesel::result::Error, _>(|| {
@@ -231,7 +230,7 @@ fn delete_task(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     let uuid = id.into_inner();

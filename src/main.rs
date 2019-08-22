@@ -28,6 +28,7 @@ impl AppData {
     }
 }
 
+#[cfg(any(feature = "sqlite", feature = "postgres"))]
 fn main() {
     let cli_matches = cli::setup_cli();
     logging::setup_logging(match cli_matches.occurrences_of("v") {
@@ -42,6 +43,24 @@ fn main() {
     let sys = actix::System::new("udb-backend");
 
     let appstate = AppData::from_configuration(configuration.clone());
+
+    let pool = match appstate.settings.db_connection.create_connection_pool() {
+        Ok(pool) => pool,
+        Err(error) => {
+            match error {
+                database::DatabaseConnectionError::IncompatibleBuild => {
+                    error!("The database you configured is not compatible with this build.")
+                }
+                database::DatabaseConnectionError::Diesel(error) => {
+                    error!("Something went wrong connecting to the database: {}", error)
+                }
+                database::DatabaseConnectionError::R2D2(error) => {
+                    error!("Something went wrong creating the connection pool: {}", error)
+                }
+            };
+            return;
+        }
+    };
 
     let jwt_key = configuration.jwt_key.clone();
     let mut server = HttpServer::new(move || {
@@ -81,7 +100,7 @@ fn main() {
                 )],
             })
             .wrap(middlewares::db_connection::DatabaseConnection {
-                pool: appstate.clone().settings.db_connection.create_sqlite_connection_pool(),
+                pool: pool.clone()
             })
             .wrap({
                 let cors = Cors::new();

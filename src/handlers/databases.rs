@@ -1,5 +1,4 @@
-use crate::models;
-use crate::schema;
+use crate::{models, schema, database::DatabaseConnection};
 use actix_web::{web, Error, FromRequest, HttpRequest, HttpResponse, Scope};
 
 use futures::future::{Future, IntoFuture};
@@ -7,7 +6,7 @@ use uuid::Uuid;
 
 use diesel::{
     r2d2::{self, ConnectionManager},
-    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, SqliteConnection,
+    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl,
 };
 
 pub fn get_scope() -> Scope {
@@ -33,7 +32,7 @@ pub fn get_scope() -> Scope {
 pub fn get_databases(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -70,7 +69,7 @@ pub fn create_database(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -115,7 +114,7 @@ pub fn get_database(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match schema::databases::table
@@ -142,7 +141,7 @@ pub fn update_database(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match diesel::update(schema::databases::table.find(format!("{}", id)))
@@ -163,7 +162,7 @@ pub fn delete_database(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match diesel::delete(schema::databases::table.find(format!("{}", id.into_inner())))

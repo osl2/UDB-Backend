@@ -1,9 +1,9 @@
-use crate::{models, schema};
+use crate::{models, schema, database::DatabaseConnection};
 use actix_web::{dev::ServiceRequest, web, Error, HttpMessage, HttpRequest, HttpResponse, Scope};
 use actix_web_httpauth::{extractors::basic::BasicAuth, middleware::HttpAuthentication};
 use diesel::{
     r2d2::{self, ConnectionManager},
-    Connection, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection,
+    Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
 };
 use futures::future::{self, Future, FutureResult, IntoFuture};
 use serde_json::json;
@@ -15,7 +15,7 @@ pub fn get_scope() -> Scope {
             let result: Result<Uuid, _> = (|| {
                 let extensions = req.extensions();
                 let conn = extensions
-                    .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+                    .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
                     .unwrap();
                 let user = schema::users::table
                     .filter(schema::users::name.eq(credentials.user_id()))
@@ -84,7 +84,7 @@ impl From<uuid::parser::ParseError> for BasicAuthError {
 fn get_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let user = extensions.get::<Uuid>().unwrap();
 
@@ -109,7 +109,7 @@ fn update_account(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let user = extensions.get::<Uuid>().unwrap();
     let account_template = json.into_inner();
@@ -135,7 +135,7 @@ fn create_account(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let account_template = json.into_inner();
     match conn.transaction::<(), diesel::result::Error, _>(|| {

@@ -1,11 +1,11 @@
-use crate::schema;
+use crate::{schema, database::DatabaseConnection};
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage,
 };
 use diesel::{
     r2d2::{self, ConnectionManager},
-    ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection,
+    ExpressionMethods, QueryDsl, RunQueryDsl,
 };
 use futures::{
     future::{ok, Either, FutureResult},
@@ -63,7 +63,7 @@ where
         let result = {
             let extensions = req.extensions();
             let conn =
-                extensions.get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>();
+                extensions.get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>();
             let token = extensions.get::<actix_web_jwt_middleware::AuthenticationData>();
 
             match req.method().as_str() {
