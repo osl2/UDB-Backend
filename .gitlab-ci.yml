@@ -22,29 +22,47 @@ cargo-test:
     - cargo clippy
     - cargo test --all --verbose
 
-docker-master:
+.docker: &docker_template
   image: docker:latest
   stage: build
   variables:
     DOCKER_HOST: unix:///var/run/docker.sock
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+   
+docker-master-postgres:
+  <<: *docker_template
   script:
-    - docker build --pull -t "$CI_REGISTRY_IMAGE" .
-    - docker push "$CI_REGISTRY_IMAGE"
+    - docker build --pull --build-arg DATABASE_BACKEND=postgres -t "${CI_REGISTRY_IMAGE}:latest-postgres" .
+    - docker push "${CI_REGISTRY_IMAGE}:latest-postgres"
   only:
     - master
 
-docker-develop:
-  image: docker:latest
-  stage: build
-  variables:
-    DOCKER_HOST: unix:///var/run/docker.sock
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+docker-master-sqlite:
+  <<: *docker_template
   script:
-    - docker build --pull -t "${CI_REGISTRY_IMAGE}:develop" .
-    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
+    - docker build --pull -t "${CI_REGISTRY_IMAGE}:latest-sqlite" .
+    - docker tag "${CI_REGISTRY_IMAGE}:latest-sqlite" "${CI_REGISTRY_IMAGE}:latest"
+    - docker push "${CI_REGISTRY_IMAGE}:latest-sqlite"
+    - docker push "${CI_REGISTRY_IMAGE}:latest"
+  only:
+    - master
+
+docker-develop-postgres:
+  <<: *docker_template
+  script:
+    - docker build --pull --build-arg DATABASE_BACKEND=postgres -t "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-postgres" .
+    - docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-postgrs"
+  only:
+    - develop
+ 
+docker-develop-sqlite:
+  <<: *docker_template
+  script:
+    - docker build --pull -t "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-sqlite" .
+    - docker tag "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-sqlite" "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}"
+    - docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-sqlite"
+    - docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}"
   only:
     - develop
 

@@ -7,7 +7,8 @@ RUN apk add --no-cache \
 RUN cargo install --no-default-features --features sqlite diesel_cli
 COPY . /src
 WORKDIR /src
-RUN cargo build --release
+ARG DATABASE_BACKEND=sqlite
+RUN cargo build --release --no-default-features --features ${DATABASE_BACKEND}
 
 
 FROM docker.io/alpine:edge
