@@ -37,7 +37,10 @@ pub fn get_scope() -> Scope {
                 }
                 Err(e) => {
                     match e {
-                        BasicAuthError::WrongPwError | BasicAuthError::UserLoadingError(_) => {}
+                        BasicAuthError::WrongPwError => {}
+                        BasicAuthError::UserLoadingError(e) => {
+                            log::error!("Couldn't load user: {:?}", e);
+                        }
                         BasicAuthError::InvalidUserID => {
                             log::error!("Invalid user id in database, here's request: {:?}", req)
                         }
