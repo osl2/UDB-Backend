@@ -170,7 +170,7 @@ fn login(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>
     ) {
         Ok(token) => Box::new(Ok(HttpResponse::Ok().json(json!({ "token": token }))).into_future()),
         Err(e) => {
-            log::error!("Couldn't encode JWT: {}", e);
+            log::error!("Couldn't encode JWT: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }

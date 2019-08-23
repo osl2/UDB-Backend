@@ -1,8 +1,8 @@
 use upowdb_models::models;
 
 fn main() -> Result<(), Box<std::error::Error>> {
-    let origin = "https://upowdb.xyz";
-    let basepath = "https://api.upowdb.xyz/api/v1";
+    let origin = "https://staging.upowdb.xyz";
+    let basepath = "http://localhost:8082/api/v1";
     let username = "elite_admin";
     let password = "2342";
 
@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     let client = reqwest::Client::builder().default_headers(headers.clone()).build()?;
 
     dbg!(client.post(&format!("{}/account/register", basepath))
-    .json(&models::Account {username: username.to_string(), password: password.to_string()}).send()?);
+    .json(&models::Account {username: username.to_string(), password: password.to_string()}).send());
 
     let token : serde_json::Value = serde_json::from_str(&dbg!(client.post(&format!("{}/account/login", basepath))
         .basic_auth(username, Some(password)).send()?.text()?))?;

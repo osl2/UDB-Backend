@@ -78,7 +78,7 @@ where
         let token = match get_token(&req) {
             Ok(token) => token,
             Err(error) => {
-                log::debug!("Could not extract token from request: {}", error);
+                log::debug!("Could not extract token from request: {:?}", error);
                 return Either::A(ok(req.into_response(
                     actix_web::HttpResponse::Unauthorized().finish().into_body(),
                 )));
@@ -132,7 +132,7 @@ where
                 Either::B(self.service.call(req))
             }
             Err(error) => {
-                log::debug!("Could not decode token: {}", error);
+                log::debug!("Could not decode token: {:?}", error);
                 Either::A(ok(req.into_response(
                     actix_web::HttpResponse::Unauthorized().finish().into_body(),
                 )))

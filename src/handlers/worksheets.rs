@@ -68,7 +68,7 @@ fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error
     }) {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
         Err(e) => {
-            log::error!("Couldn't load worksheet: {}", e);
+            log::error!("Couldn't load worksheet: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -129,7 +129,7 @@ fn create_worksheet(
     }) {
         Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
         Err(e) => {
-            log::error!("Couldn't create worksheet: {}", e);
+            log::error!("Couldn't create worksheet: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -169,7 +169,7 @@ fn get_worksheet(
                 Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
             }
             e => {
-                log::error!("{}", e);
+                log::error!("Error looking for worksheet: {:?}", e);
                 Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
             }
         },
@@ -226,7 +226,7 @@ fn update_worksheet(
     }) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't update worksheet: {}", e);
+            log::error!("Couldn't update worksheet: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -253,7 +253,7 @@ fn delete_worksheet(
     }) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't delete worksheet: {}", e);
+            log::error!("Couldn't delete worksheet: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }

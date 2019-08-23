@@ -65,7 +65,7 @@ fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Er
             Box::new(Ok(HttpResponse::Ok().json(tasks)).into_future())
         }
         Err(e) => {
-            log::error!("Couldn't get tasks: {}", e);
+            log::error!("Couldn't get tasks: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -124,7 +124,7 @@ fn create_task(
     }) {
         Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
         Err(e) => {
-            log::error!("Couldn't create task: {}", e);
+            log::error!("Couldn't create task: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -164,7 +164,7 @@ fn get_task(
                 Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
             }
             e => {
-                log::error!("Couldn't load task: {}", e);
+                log::error!("Couldn't load task: {:?}", e);
                 Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
             }
         },
@@ -218,7 +218,7 @@ fn update_task(
     }) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't update task: {}", e);
+            log::error!("Couldn't update task: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -255,7 +255,7 @@ fn delete_task(
     }) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't delete task: {}", e);
+            log::error!("Couldn't delete task: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }

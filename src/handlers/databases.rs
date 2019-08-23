@@ -57,7 +57,7 @@ pub fn get_databases(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Er
     {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
         Err(e) => {
-            log::error!("Couldn't load database: {}", e);
+            log::error!("Couldn't load database: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -102,7 +102,7 @@ pub fn create_database(
     }) {
         Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
         Err(e) => {
-            log::error!("Couldn't create database: {}", e);
+            log::error!("Couldn't create database: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -127,7 +127,7 @@ pub fn get_database(
                 Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
             }
             e => {
-                log::error!("Couldn't load database: {}", e);
+                log::error!("Couldn't load database: {:?}", e);
                 Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
             }
         },
@@ -150,7 +150,7 @@ pub fn update_database(
     {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't update database: {}", e);
+            log::error!("Couldn't update database: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -170,7 +170,7 @@ pub fn delete_database(
     {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't delete database: {}", e);
+            log::error!("Couldn't delete database: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }

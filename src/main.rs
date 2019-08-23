@@ -52,10 +52,10 @@ fn main() {
                     error!("The database you configured is not compatible with this build.")
                 }
                 database::DatabaseConnectionError::Diesel(error) => {
-                    error!("Something went wrong connecting to the database: {}", error)
+                    error!("Something went wrong connecting to the database: {:?}", error)
                 }
                 database::DatabaseConnectionError::R2D2(error) => {
-                    error!("Something went wrong creating the connection pool: {}", error)
+                    error!("Something went wrong creating the connection pool: {:?}", error)
                 }
             };
             return;
@@ -142,6 +142,6 @@ fn main() {
 
     match sys.run() {
         Ok(_) => (),
-        Err(e) => error!("Something went wrong starting the runtime: {}", e),
+        Err(e) => error!("Something went wrong starting the runtime: {:?}", e),
     }
 }

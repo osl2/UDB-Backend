@@ -55,7 +55,7 @@ fn get_subtasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error =
     {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
         Err(e) => {
-            log::error!("Couldn't get subtasks: {}", e);
+            log::error!("Couldn't get subtasks: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -99,7 +99,7 @@ fn create_subtask(
     }) {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().body(result.to_string())).into_future()),
         Err(e) => {
-            log::error!("Couldn't create subtask: {}", e);
+            log::error!("Couldn't create subtask: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -123,7 +123,7 @@ fn get_subtask(
                 Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
             }
             e => {
-                log::error!("Couldn't get subtask: {}", e);
+                log::error!("Couldn't get subtask: {:?}", e);
                 Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
             }
         },
@@ -145,7 +145,7 @@ fn update_subtask(
     {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't update subtask: {}", e);
+            log::error!("Couldn't update subtask: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -181,7 +181,7 @@ fn delete_subtask(
     }) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't delete subtask: {}", e);
+            log::error!("Couldn't delete subtask: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -219,7 +219,7 @@ fn verify_subtask_solution(
             Box::new(Ok(HttpResponse::Ok().json(result)).into_future())
         }
         Err(e) => {
-            log::error!("Couldn't compare solution: {}", e);
+            log::error!("Couldn't compare solution: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
