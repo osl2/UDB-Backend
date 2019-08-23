@@ -67,7 +67,7 @@ fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
             Box::new(Ok(HttpResponse::Ok().json(courses)).into_future())
         }
         Err(e) => {
-            log::error!("Couldn't get courses: {}", e);
+            log::error!("Couldn't get courses: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -127,7 +127,7 @@ fn create_course(
     }) {
         Ok(course_id) => Box::new(Ok(HttpResponse::Ok().body(course_id.to_string())).into_future()),
         Err(e) => {
-            log::error!("Could not create course: {}", e);
+            log::error!("Could not create course: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -168,7 +168,7 @@ fn get_course(
                 Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
             }
             e => {
-                log::error!("Couldn't get course: {}", e);
+                log::error!("Couldn't get course: {:?}", e);
                 Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
             }
         },
@@ -225,7 +225,7 @@ fn update_course(
     }) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't update course: {}", e);
+            log::error!("Couldn't update course: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -259,7 +259,7 @@ fn delete_course(
     }) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't delete course: {}", e);
+            log::error!("Couldn't delete course: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }

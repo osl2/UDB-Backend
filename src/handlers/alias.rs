@@ -64,7 +64,7 @@ fn create_alias(
         Ok(alias) => Box::new(Ok(HttpResponse::Ok().body(alias)).into_future()),
         Err(e) => match e {
             AliasError::Diesel(e) => {
-                log::error!("Couldn't create new alias: {}", e);
+                log::error!("Couldn't create new alias: {:?}", e);
                 Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
             }
             AliasError::NoFreeAliases => Box::new(
@@ -101,7 +101,7 @@ fn get_alias(
     {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
         Err(e) => {
-            log::error!("Couldn't get alias: {}", e);
+            log::error!("Couldn't get alias: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }
@@ -122,7 +122,7 @@ fn get_uuid(
     {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
         Err(e) => {
-            log::error!("Couldn't get alias: {}", e);
+            log::error!("Couldn't get alias: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }

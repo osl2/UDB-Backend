@@ -82,7 +82,7 @@ where
                                         OwnershipCheckerError::NoAccess
                                     }
                                     e => {
-                                        log::error!("Couldn't query object access: {}", e);
+                                        log::error!("Couldn't query object access: {:?}", e);
                                         OwnershipCheckerError::Undefined
                                     }
                                 })
