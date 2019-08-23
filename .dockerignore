@@ -1,3 +1,6 @@
 target
 .git
 actix-web-jwt-middleware/test/target
+actix-web-jwt-middleware/target
+upowdb-cli/target
+upowdb-models/target

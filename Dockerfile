@@ -5,7 +5,7 @@ RUN apk add --no-cache \
       sqlite-dev \
       postgresql-dev \
       openssl-dev
-RUN cargo install --no-default-features --features sqlite diesel_cli
+RUN cargo install --no-default-features --features "sqlite postgres" diesel_cli
 COPY . /src
 WORKDIR /src
 ARG DATABASE_BACKEND=sqlite
