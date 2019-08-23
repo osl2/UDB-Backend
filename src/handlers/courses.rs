@@ -1,11 +1,8 @@
-use crate::models;
-use crate::models::WorksheetsInCourse;
-use crate::schema;
+use crate::{models::{self, WorksheetsInCourse}, schema, database::DatabaseConnection};
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 use diesel::{
     prelude::*,
     r2d2::{self, ConnectionManager},
-    SqliteConnection,
 };
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
@@ -28,7 +25,7 @@ pub fn get_scope() -> Scope {
 fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let current_user = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -82,7 +79,7 @@ fn create_course(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
@@ -142,7 +139,7 @@ fn get_course(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match schema::courses::table
@@ -185,7 +182,7 @@ fn update_course(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     let course = json.into_inner();
@@ -240,7 +237,7 @@ fn delete_course(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     let uuid = id.into_inner();

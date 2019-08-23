@@ -1,10 +1,8 @@
 use crate::alias_generator::AliasGenerator;
-use crate::models;
-use crate::schema;
+use crate::{models, schema, database::DatabaseConnection};
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 use diesel::{
     r2d2::{self, ConnectionManager},
-    sqlite::SqliteConnection,
     Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
 };
 use futures::future::{Future, IntoFuture};
@@ -24,7 +22,7 @@ fn create_alias(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match conn.transaction::<String, AliasError, _>(|| {
@@ -94,7 +92,7 @@ fn get_alias(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match schema::aliases::table
@@ -115,7 +113,7 @@ fn get_uuid(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let extensions = req.extensions();
     let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
         .unwrap();
 
     match schema::aliases::table

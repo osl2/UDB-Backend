@@ -3,16 +3,19 @@ RUN apk add --no-cache \
       cargo \
       build-base \
       sqlite-dev \
+      postgresql-dev \
       openssl-dev
 RUN cargo install --no-default-features --features sqlite diesel_cli
 COPY . /src
 WORKDIR /src
-RUN cargo build --release
+ARG DATABASE_BACKEND=sqlite
+RUN cargo build --release --no-default-features --features ${DATABASE_BACKEND}
 
 
 FROM docker.io/alpine:edge
 RUN apk add --no-cache \
       sqlite-libs \
+      postgresql-libs \
       libgcc \
       libssl1.1 \
  && mkdir -p /opt/upowdb
