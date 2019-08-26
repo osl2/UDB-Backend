@@ -45,6 +45,7 @@ fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Er
         .select((
             schema::tasks::columns::id,
             schema::tasks::columns::database_id,
+            schema::tasks::columns::name,
         ))
         .load::<models::QueryableTask>(&*conn)
     {
@@ -58,6 +59,7 @@ fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Er
                     .load::<String>(&*conn);
                 tasks.push(models::Task {
                     id: task.id,
+                    name: task.name,
                     database_id: task.database_id,
                     subtasks: subtasks_query.unwrap(),
                 });
@@ -93,6 +95,7 @@ fn create_task(
         let task_id = Uuid::new_v4();
         let new_task = models::QueryableTask {
             id: task_id.to_string(),
+            name: task.name,
             database_id: task.database_id,
         };
 
@@ -153,6 +156,7 @@ fn get_task(
             Box::new(
                 Ok(HttpResponse::Ok().json(models::Task {
                     id: task.id,
+                    name: task.name,
                     database_id: task.database_id,
                     subtasks: subtasks_query.unwrap(),
                 }))
