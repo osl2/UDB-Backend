@@ -212,9 +212,7 @@ fn verify_subtask_solution(
                 return Box::new(Ok(HttpResponse::NotFound().finish()).into_future());
             }
 
-            let teacher_solution = subtask.content.get_solution().unwrap();
-
-            let result = compare_solutions(student_solution, teacher_solution);
+            let result = compare_solutions(student_solution, subtask);
 
             Box::new(Ok(HttpResponse::Ok().json(result)).into_future())
         }
