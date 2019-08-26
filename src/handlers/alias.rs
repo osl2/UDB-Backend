@@ -122,8 +122,8 @@ fn get_uuid(
     {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
         Err(e) => {
-            log::error!("Couldn't get alias: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            log::error!("Couldn't get uuid: {:?}", e);
+            Box::new(Ok(HttpResponse::InternalServerError().body(format!("Couldn't get uuid: {}", e))).into_future())
         }
     }
 }
