@@ -243,11 +243,21 @@ fn delete_worksheet(
 
     match conn.transaction::<(), diesel::result::Error, _>(|| {
         let uuid = id.into_inner();
+
+        // delete task associations
         diesel::delete(
             schema::tasks_in_worksheets::table
                 .filter(schema::tasks_in_worksheets::worksheet_id.eq(uuid.to_string())),
         )
         .execute(&*conn)?;
+
+        // delete course associations
+        diesel::delete(
+            schema::worksheets_in_courses::table
+                .filter(schema::worksheets_in_courses::worksheet_id.eq(uuid.to_string()))
+        )
+        .execute(&*conn)?;
+
         diesel::delete(schema::worksheets::table.find(format!("{}", uuid))).execute(&*conn)?;
         Ok(())
     }) {
