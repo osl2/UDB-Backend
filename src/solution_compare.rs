@@ -1,5 +1,6 @@
 use crate::models::{
-    MCSolutionResult, PlaintextSolutionResult, SQLSolutionResult, Solution, SolutionResult,
+    MCSolutionResult, PlaintextSolutionResult, SQLSolutionResult, Solution, SolutionResult, Subtask,
+    Content
 };
 
 pub fn rows_equal(row1: &[String], row2: &[String]) -> bool {
@@ -14,7 +15,10 @@ pub fn rows_equal(row1: &[String], row2: &[String]) -> bool {
     true
 }
 
-pub fn compare_solutions(student_solution: Solution, teacher_solution: Solution) -> SolutionResult {
+pub fn compare_solutions(student_solution: Solution, subtask: Subtask) -> SolutionResult {
+
+    let teacher_solution = subtask.content.get_solution().unwrap();
+
     match (student_solution, teacher_solution) {
         (Solution::SQL(student_solution), Solution::SQL(teacher_solution)) => {
             // indices of rows in teacher solution that have been found in student solution:
@@ -23,6 +27,24 @@ pub fn compare_solutions(student_solution: Solution, teacher_solution: Solution)
             let mut wrong_rows: Vec<Vec<String>> = Vec::new();
             // rows in teacher solution that are not present in student solution:
             let mut missed_rows: Vec<Vec<String>> = Vec::new();
+
+            // if row order matters, comparison is straightforward
+            match subtask.content {
+                Content::SQL { row_order_matters: true, .. } => {
+                    for (student_row, teacher_row) in student_solution.rows.iter().zip(teacher_solution.rows.iter()) {
+                        if !rows_equal(student_row, teacher_row) {
+                            wrong_rows.push(student_row.clone());
+                        }
+                    }
+                    return SolutionResult::SQL(SQLSolutionResult {
+                        correct: wrong_rows.is_empty(),
+                        wrong_rows,
+                        missed_rows,
+                    })
+                },
+                _ => {}
+            }
+            // row order does not matter:
 
             // find wrong rows in student solution
             for student_row in student_solution.rows.iter() {
@@ -44,10 +66,8 @@ pub fn compare_solutions(student_solution: Solution, teacher_solution: Solution)
             for (index, teacher_row) in teacher_solution.rows.iter().enumerate() {
                 if visited_teacher_rows.len() <= i {
                     missed_rows.push(teacher_row.clone());
-                } else if index == visited_teacher_rows[i] {
+                } else if visited_teacher_rows.contains(&index) {
                     // skip row if already found pair in previous loop.
-                    // we know that indices in visited_teacher_rows are in order,
-                    // so the next one is the next index coming up
                     i += 1;
                 } else {
                     missed_rows.push(teacher_row.clone());
@@ -105,39 +125,173 @@ pub fn compare_solutions(student_solution: Solution, teacher_solution: Solution)
 mod tests {
     use crate::models::{SQLSolution, Solution};
     use crate::solution_compare;
+    use upowdb_models::models::{Subtask, Content, SolutionResult, AllowedSQL};
+
+    /// Creates a mock sqltask with given options
+    fn new_sqltask(row_order_matters: bool, solution: SQLSolution) -> Subtask {
+        Subtask {
+            id: "".to_string(),
+            instruction: "".to_string(),
+            is_solution_verifiable: false,
+            is_solution_visible: false,
+            content: Content::SQL {
+                is_point_and_click_allowed: false,
+                row_order_matters,
+                allowed_sql: AllowedSQL::ALL,
+                solution: Some(solution),
+            },
+        }
+    }
+
+    /// helper method to convert Vec<&str> into Vec<String>
+    fn as_strings(v: Vec<&str>) -> Vec<String> {
+        v.into_iter().map(String::from).collect()
+    }
 
     #[test]
     fn rows_equal() {
-        let row1 = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let row2 = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        let row3 = vec!["x".to_string(), "y".to_string(), "z".to_string()];
+        let row1 = as_strings(vec!["a", "b", "c"]);
+        let row2 = as_strings(vec!["a", "b", "c"]);
+        let row3 = as_strings(vec!["x", "y", "z"]);
         assert_eq!(solution_compare::rows_equal(&row1, &row2), true);
         assert_eq!(solution_compare::rows_equal(&row2, &row3), false);
     }
 
     #[test]
-    fn comparing() {
-        let solution1 = Solution::SQL(SQLSolution {
+    fn comparing_sql_solution_correct() {
+        let solution = Solution::SQL(SQLSolution {
             query: "SELECT * FROM users;".to_string(),
-            columns: vec!["id".to_string(), "name".to_string(), "age".to_string()],
+            columns: as_strings(vec!["id", "name", "age"]),
             rows: vec![
-                vec!["1".to_string(), "Alice".to_string(), "21".to_string()],
-                vec!["2".to_string(), "Bob".to_string(), "32".to_string()],
-                vec!["6".to_string(), "Bill".to_string(), "33".to_string()],
-                vec!["3".to_string(), "Charlie".to_string(), "5".to_string()],
-            ],
-        });
-        let solution2 = Solution::SQL(SQLSolution {
-            query: "SELECT * FROM users;".to_string(),
-            columns: vec!["id".to_string(), "name".to_string(), "age".to_string()],
-            rows: vec![
-                vec!["5".to_string(), "Ball".to_string(), "31".to_string()],
-                vec!["2".to_string(), "Bob".to_string(), "32".to_string()],
-                vec!["3".to_string(), "Charlie".to_string(), "5".to_string()],
-                vec!["4".to_string(), "Dennis".to_string(), "17".to_string()],
+                as_strings(vec!["1", "Alice", "21"]),
+                as_strings(vec!["2", "Bob", "32"]),
+                as_strings(vec!["6", "Bill", "33"]),
+                as_strings(vec!["3", "Charlie", "5"]),
             ],
         });
 
-        solution_compare::compare_solutions(solution1, solution2);
+        let subtask = new_sqltask(
+            false,
+            SQLSolution {
+                query: "SELECT * FROM users;".to_string(),
+                columns: as_strings(vec!["id", "name", "age"]),
+                rows: vec![
+                    as_strings(vec!["3", "Charlie", "5"]),
+                    as_strings(vec!["1", "Alice", "21"]),
+                    as_strings(vec!["6", "Bill", "33"]),
+                    as_strings(vec!["2", "Bob", "32"]),
+                ],
+        });
+
+        match solution_compare::compare_solutions(solution, subtask) {
+            SolutionResult::SQL(result) => {
+                assert_eq!(result.correct, true);
+            },
+            _ => panic!("Wrong solution type"),
+        }
+    }
+
+    #[test]
+    fn comparing_sql_solution_wrong() {
+        let solution = Solution::SQL(SQLSolution {
+            query: "SELECT * FROM users;".to_string(),
+            columns: as_strings(vec!["id", "name", "age"]),
+            rows: vec![
+                as_strings(vec!["2", "Bob", "32"]),
+                as_strings(vec!["3", "Charlie", "5"]),
+                as_strings(vec!["4", "David", "21"]),
+                as_strings(vec!["1", "Alice", "21"]),
+            ],
+        });
+
+        let subtask = new_sqltask(
+            false,
+            SQLSolution {
+                query: "SELECT * FROM users;".to_string(),
+                columns: as_strings(vec!["id", "name", "age"]),
+                rows: vec![
+                    as_strings(vec!["1", "Alice", "21"]),
+                    as_strings(vec!["2", "Bob", "32"]),
+                    as_strings(vec!["6", "Bill", "33"]),
+                    as_strings(vec!["3", "Charlie", "5"]),
+                ],
+            });
+
+        match solution_compare::compare_solutions(solution, subtask) {
+            SolutionResult::SQL(result) => {
+                assert_eq!(result.correct, false);
+                assert_eq!(result.missed_rows, vec![as_strings(vec!["6", "Bill", "33"])]);
+                assert_eq!(result.wrong_rows, vec![as_strings(vec!["4", "David", "21"])]);
+            },
+            _ => panic!("Wrong solution type"),
+        }
+    }
+
+    #[test]
+    fn comparing_sql_solution_order_correct() {
+        let solution = Solution::SQL(SQLSolution {
+            query: "SELECT * FROM users;".to_string(),
+            columns: as_strings(vec!["id", "name", "age"]),
+            rows: vec![
+                as_strings(vec!["1", "Alice", "21"]),
+                as_strings(vec!["2", "Bob", "32"]),
+                as_strings(vec!["6", "Bill", "33"]),
+                as_strings(vec!["3", "Charlie", "5"]),
+            ],
+        });
+
+        let subtask = new_sqltask(
+            true,
+            SQLSolution {
+                query: "SELECT * FROM users;".to_string(),
+                columns: as_strings(vec!["id", "name", "age"]),
+                rows: vec![
+                    as_strings(vec!["1", "Alice", "21"]),
+                    as_strings(vec!["2", "Bob", "32"]),
+                    as_strings(vec!["6", "Bill", "33"]),
+                    as_strings(vec!["3", "Charlie", "5"]),
+                ],
+            });
+
+        match solution_compare::compare_solutions(solution, subtask) {
+            SolutionResult::SQL(result) => {
+                assert_eq!(result.correct, true);
+            },
+            _ => panic!("Wrong solution type"),
+        }
+    }
+
+    #[test]
+    fn comparing_sql_solution_order_wrong() {
+        let solution = Solution::SQL(SQLSolution {
+            query: "SELECT * FROM users;".to_string(),
+            columns: as_strings(vec!["id", "name", "age"]),
+            rows: vec![
+                as_strings(vec!["1", "Alice", "21"]),
+                as_strings(vec!["2", "Bob", "32"]),
+                as_strings(vec!["3", "Charlie", "5"]),
+                as_strings(vec!["4", "David", "21"]),
+            ],
+        });
+
+        let subtask = new_sqltask(
+            true,
+            SQLSolution {
+                query: "SELECT * FROM users;".to_string(),
+                columns: as_strings(vec!["id", "name", "age"]),
+                rows: vec![
+                    as_strings(vec!["1", "Alice", "21"]),
+                    as_strings(vec!["2", "Bob", "32"]),
+                    as_strings(vec!["6", "Bill", "33"]),
+                    as_strings(vec!["3", "Charlie", "5"]),
+                ],
+            });
+
+        match solution_compare::compare_solutions(solution, subtask) {
+            SolutionResult::SQL(result) => {
+                assert_eq!(result.correct, false);
+            },
+            _ => panic!("Wrong solution type"),
+        }
     }
 }
