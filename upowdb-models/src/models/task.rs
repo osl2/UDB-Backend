@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct Task {
     #[serde(rename = "id")]
     pub id: String,
+    #[serde(rename = "name")]
+    pub name: Option<String>,
     #[serde(rename = "database")]
     pub database_id: String,
     #[serde(rename = "subtasks")]
@@ -18,6 +20,7 @@ pub struct Task {
 pub struct QueryableTask {
     pub id: String,
     pub database_id: String,
+    pub name: Option<String>,
 }
 
 impl QueryableTask {
@@ -25,6 +28,7 @@ impl QueryableTask {
         Self {
             id: task.id,
             database_id: task.database_id,
+            name: task.name,
         }
     }
 }
