@@ -1,5 +1,4 @@
 -- This file should undo anything in `up.sql`
-PRAGMA foreign_keys=OFF;
 CREATE TABLE new_tasks (
    id CHAR(36) PRIMARY KEY NOT NULL,
    name TEXT,
@@ -9,5 +8,3 @@ CREATE TABLE new_tasks (
 INSERT INTO new_tasks SELECT tasks.id, tasks.name, tasks.database_id FROM tasks;
 DROP TABLE tasks;
 ALTER TABLE new_tasks RENAME TO tasks;
-PRAGMA foreign_key_check;
-PRAGMA foreign_keys=ON;

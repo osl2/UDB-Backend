@@ -26,7 +26,7 @@ pub struct QueryableTask {
 impl QueryableTask {
     pub fn from_task(task: Task) -> Self {
         let db_id;
-        if (task.database_id == "") {
+        if task.database_id == "" {
             db_id = None;
         } else {
             db_id = Some(task.database_id);
