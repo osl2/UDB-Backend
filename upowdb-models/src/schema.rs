@@ -50,7 +50,7 @@ table! {
 table! {
     tasks (id) {
         id -> Text,
-        database_id -> Text,
+        database_id -> Nullable<Text>,
         name -> Nullable<Text>,
     }
 }

@@ -60,7 +60,7 @@ fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Er
                 tasks.push(models::Task {
                     id: task.id,
                     name: task.name,
-                    database_id: task.database_id,
+                    database_id: task.database_id.unwrap_or("".to_string()),
                     subtasks: subtasks_query.unwrap(),
                 });
             }
@@ -93,11 +93,7 @@ fn create_task(
         // create task object
         let task = json.into_inner();
         let task_id = Uuid::new_v4();
-        let new_task = models::QueryableTask {
-            id: task_id.to_string(),
-            name: task.name,
-            database_id: task.database_id,
-        };
+        let new_task = models::QueryableTask::from_task(task.clone());
 
         // insert access for user
         diesel::insert_into(schema::access::table)
@@ -157,7 +153,7 @@ fn get_task(
                 Ok(HttpResponse::Ok().json(models::Task {
                     id: task.id,
                     name: task.name,
-                    database_id: task.database_id,
+                    database_id: task.database_id.unwrap_or("".to_string()),
                     subtasks: subtasks_query.unwrap(),
                 }))
                 .into_future(),
