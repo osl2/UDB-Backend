@@ -38,15 +38,15 @@ docker-master-postgres:
   only:
     - master
 
-docker-master-sqlite:
-  <<: *docker_template
-  script:
-    - docker build --pull -t "${CI_REGISTRY_IMAGE}:latest-sqlite" .
-    - docker tag "${CI_REGISTRY_IMAGE}:latest-sqlite" "${CI_REGISTRY_IMAGE}:latest"
-    - docker push "${CI_REGISTRY_IMAGE}:latest-sqlite"
-    - docker push "${CI_REGISTRY_IMAGE}:latest"
-  only:
-    - master
+#docker-master-sqlite:
+#  <<: *docker_template
+#  script:
+#    - docker build --pull -t "${CI_REGISTRY_IMAGE}:latest-sqlite" .
+#    - docker tag "${CI_REGISTRY_IMAGE}:latest-sqlite" "${CI_REGISTRY_IMAGE}:latest"
+#    - docker push "${CI_REGISTRY_IMAGE}:latest-sqlite"
+#    - docker push "${CI_REGISTRY_IMAGE}:latest"
+#  only:
+#    - master
 
 docker-develop-postgres:
   <<: *docker_template
@@ -56,15 +56,15 @@ docker-develop-postgres:
   only:
     - develop
  
-docker-develop-sqlite:
-  <<: *docker_template
-  script:
-    - docker build --pull -t "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-sqlite" .
-    - docker tag "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-sqlite" "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}"
-    - docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-sqlite"
-    - docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}"
-  only:
-    - develop
+#docker-develop-sqlite:
+#  <<: *docker_template
+#  script:
+#    - docker build --pull -t "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-sqlite" .
+#    - docker tag "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-sqlite" "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}"
+#    - docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}-sqlite"
+#    - docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_SLUG}"
+#  only:
+#    - develop
 
 deploy-master:
   image: appropriate/curl
