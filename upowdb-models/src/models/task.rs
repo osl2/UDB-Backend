@@ -19,15 +19,21 @@ pub struct Task {
 #[table_name = "tasks"]
 pub struct QueryableTask {
     pub id: String,
-    pub database_id: String,
+    pub database_id: Option<String>,
     pub name: Option<String>,
 }
 
 impl QueryableTask {
     pub fn from_task(task: Task) -> Self {
+        let db_id;
+        if (task.database_id == "") {
+            db_id = None;
+        } else {
+            db_id = Some(task.database_id);
+        }
         Self {
             id: task.id,
-            database_id: task.database_id,
+            database_id: db_id,
             name: task.name,
         }
     }
