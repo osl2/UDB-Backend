@@ -91,8 +91,9 @@ fn create_task(
 
     match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
         // create task object
-        let task = json.into_inner();
+        let mut task = json.into_inner();
         let task_id = Uuid::new_v4();
+        task.id = task_id.to_string();
         let new_task = models::QueryableTask::from_task(task.clone());
 
         // insert access for user
