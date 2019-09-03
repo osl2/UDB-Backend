@@ -31,6 +31,7 @@ pub enum DatabaseConnectionConfig {
     Postgres { uri: String },
 }
 
+#[derive(Debug)]
 pub enum DatabaseConnectionError {
     IncompatibleBuild,
     Diesel(diesel::ConnectionError),

@@ -63,13 +63,13 @@ where
         let result = {
             let extensions = req.extensions();
             let conn =
-                extensions.get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>();
+                extensions.get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>().unwrap();
             let token = extensions.get::<uuid::Uuid>();
 
             match req.method().as_str() {
                 "PUT" | "DELETE" => {
-                    match (conn, token, id) {
-                        (Some(conn), Some(token), Some(id)) => {
+                    match (token, id) {
+                        (Some(token), Some(id)) => {
                             // Check whether the user has access to the object
                             schema::access::table
                                 .filter(schema::access::object_id.eq(id.as_str().to_string()))
@@ -86,7 +86,10 @@ where
                                 })
                                 .map(|_| ())
                         }
-                        _ => Err(OwnershipCheckerError::Undefined),
+                        error => {
+                            log::error!("Couldn't query object access: {:?}", error);
+                            Err(OwnershipCheckerError::Undefined)
+                        },
                     }
                 }
                 _ => Ok(()),
