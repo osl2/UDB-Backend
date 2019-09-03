@@ -12,7 +12,7 @@ pub use self::solution::{
     SQLSolutionResult, Solution, SolutionResult,
 };
 mod subtask;
-pub use self::subtask::{Subtask, AllowedSQL};
+pub use self::subtask::{AllowedSQL, Subtask};
 mod task;
 pub use self::task::{QueryableTask, SubtasksInTask, Task};
 mod token;

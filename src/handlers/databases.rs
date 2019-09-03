@@ -1,17 +1,15 @@
-use crate::{models, schema, database::DatabaseConnection};
+use crate::{
+    models,
+    util::{database, internal_server_error, user},
+};
 use actix_web::{web, Error, FromRequest, HttpRequest, HttpResponse, Scope};
 
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
 
-use diesel::{
-    r2d2::{self, ConnectionManager},
-    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl,
-};
-
 pub fn get_scope() -> Scope {
     let json_config = web::Json::<models::Database>::configure(|cfg| {
-        cfg.limit(4*(1024usize.pow(2))) //4MB limit
+        cfg.limit(4 * (1024usize.pow(2))) //4MB limit
     });
     web::scope("/databases")
         .service(
@@ -30,36 +28,15 @@ pub fn get_scope() -> Scope {
 }
 
 pub fn get_databases(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-    let sub = extensions
-        .get::<actix_web_jwt_middleware::AuthenticationData>()
-        .unwrap()
-        .claims
-        .sub
-        .clone()
-        .unwrap();
-
-    match schema::databases::table
-        .inner_join(
-            schema::access::table
-                .on(schema::databases::columns::id.eq(schema::access::columns::object_id)),
-        )
-        .filter(schema::access::columns::user_id.eq(sub))
-        .select((
-            schema::databases::columns::id,
-            schema::databases::columns::name,
-            schema::databases::columns::content,
-        ))
-        .load::<models::Database>(&*conn)
-    {
+    match database(&req).get_databases(user(&req)) {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
-        Err(e) => {
-            log::error!("Couldn't load database: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+        Err(e) => Box::new(
+            Ok(internal_server_error(format!(
+                "Couldn't load database: {:?}",
+                e
+            )))
+            .into_future(),
+        ),
     }
 }
 
@@ -67,44 +44,15 @@ pub fn create_database(
     req: HttpRequest,
     json: web::Json<models::Database>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-    let sub = extensions
-        .get::<actix_web_jwt_middleware::AuthenticationData>()
-        .unwrap()
-        .claims
-        .sub
-        .clone()
-        .unwrap();
-
-    match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
-        // create database object
-        let mut new_database = json.into_inner();
-        let id = Uuid::new_v4();
-        new_database.id = id.to_string();
-
-        // insert access for user
-        diesel::insert_into(schema::access::table)
-            .values(models::Access {
-                user_id: sub,
-                object_id: id.to_string(),
-            })
-            .execute(&*conn)?;
-
-        // insert database object
-        diesel::insert_into(schema::databases::table)
-            .values(new_database)
-            .execute(&*conn)?;
-
-        Ok(id)
-    }) {
-        Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
-        Err(e) => {
-            log::error!("Couldn't create database: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+    match database(&req).create_database(user(&req), json.into_inner()) {
+        Ok(id) => Box::new(Ok(HttpResponse::Created().body(id.to_string())).into_future()),
+        Err(e) => Box::new(
+            Ok(internal_server_error(format!(
+                "Couldn't create database: {:?}",
+                e
+            )))
+            .into_future(),
+        ),
     }
 }
 
@@ -112,24 +60,19 @@ pub fn get_database(
     req: HttpRequest,
     id: web::Path<Uuid>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-
-    match schema::databases::table
-        .find(format!("{}", id))
-        .get_result::<models::Database>(&*conn)
-    {
+    match database(&req).get_database(id.into_inner()) {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
         Err(e) => match e {
-            diesel::result::Error::NotFound => {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::NotFound) => {
                 Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
             }
-            e => {
-                log::error!("Couldn't load database: {:?}", e);
-                Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-            }
+            e => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't load database: {:?}",
+                    e
+                )))
+                .into_future(),
+            ),
         },
     }
 }
@@ -139,20 +82,20 @@ pub fn update_database(
     id: web::Path<Uuid>,
     json: web::Json<models::Database>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-
-    match diesel::update(schema::databases::table.find(format!("{}", id)))
-        .set(json.into_inner())
-        .execute(&*conn)
-    {
+    match database(&req).update_database(id.into_inner(), json.into_inner()) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
-        Err(e) => {
-            log::error!("Couldn't update database: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+        Err(e) => match e {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::NotFound) => {
+                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
+            }
+            e => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't update database: {:?}",
+                    e
+                )))
+                .into_future(),
+            ),
+        },
     }
 }
 
@@ -160,18 +103,19 @@ pub fn delete_database(
     req: HttpRequest,
     id: web::Path<Uuid>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-
-    match diesel::delete(schema::databases::table.find(format!("{}", id.into_inner())))
-        .execute(&*conn)
-    {
+    match database(&req).delete_database(id.into_inner()) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
-        Err(e) => {
-            log::error!("Couldn't delete database: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+        Err(e) => match e {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::NotFound) => {
+                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
+            }
+            e => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't delete database: {:?}",
+                    e
+                )))
+                .into_future(),
+            ),
+        },
     }
 }

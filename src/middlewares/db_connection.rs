@@ -2,55 +2,46 @@ use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage,
 };
-use diesel::r2d2::{self, ConnectionManager};
 use futures::{
     future::{ok, Either, FutureResult},
     Poll,
 };
 
-pub struct DatabaseConnection<C: 'static>
-where
-    C: diesel::Connection,
-{
-    pub pool: r2d2::Pool<ConnectionManager<C>>,
+pub struct DatabaseConnection {
+    pub database: crate::database::Database,
 }
 
-impl<S, B, C> Transform<S> for DatabaseConnection<C>
+impl<S, B> Transform<S> for DatabaseConnection
 where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
     S::Future: 'static,
     B: 'static,
-    C: diesel::Connection,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
     type InitError = ();
-    type Transform = DatabaseConnectionMiddleware<C, S>;
+    type Transform = DatabaseConnectionMiddleware<S>;
     type Future = FutureResult<Self::Transform, Self::InitError>;
 
     fn new_transform(&self, service: S) -> Self::Future {
         ok(DatabaseConnectionMiddleware {
             service,
-            pool: self.pool.clone(),
+            database: self.database.clone(),
         })
     }
 }
 
-pub struct DatabaseConnectionMiddleware<C: 'static, S>
-where
-    C: diesel::Connection,
-{
+pub struct DatabaseConnectionMiddleware<S> {
     service: S,
-    pool: r2d2::Pool<ConnectionManager<C>>,
+    database: crate::database::Database,
 }
 
-impl<S, B, C> Service for DatabaseConnectionMiddleware<C, S>
+impl<S, B> Service for DatabaseConnectionMiddleware<S>
 where
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
     S::Future: 'static,
     B: 'static,
-    C: diesel::Connection,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
@@ -65,7 +56,7 @@ where
         let mut i = 0;
         loop {
             i += 1;
-            match self.pool.get() {
+            match self.database.get_connection() {
                 Ok(pooled_conn) => {
                     req.extensions_mut().insert(pooled_conn);
                     return Either::A(self.service.call(req));

@@ -1,4 +1,4 @@
-use crate::{schema, database::DatabaseConnection};
+use crate::{database::DatabaseConnection, schema};
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage,
@@ -64,7 +64,7 @@ where
             let extensions = req.extensions();
             let conn =
                 extensions.get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>();
-            let token = extensions.get::<actix_web_jwt_middleware::AuthenticationData>();
+            let token = extensions.get::<uuid::Uuid>();
 
             match req.method().as_str() {
                 "PUT" | "DELETE" => {
@@ -73,9 +73,7 @@ where
                             // Check whether the user has access to the object
                             schema::access::table
                                 .filter(schema::access::object_id.eq(id.as_str().to_string()))
-                                .filter(
-                                    schema::access::user_id.eq(token.claims.sub.clone().unwrap()),
-                                )
+                                .filter(schema::access::user_id.eq(token.to_string()))
                                 .get_result::<(String, String)>(&*conn)
                                 .map_err(|e| match e {
                                     diesel::result::Error::NotFound => {

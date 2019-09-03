@@ -42,7 +42,7 @@ where
             key: self.key.clone(),
             algorithm: self.algorithm,
             except: self.except.clone(),
-            service: service,
+            service,
         })
     }
 }
@@ -93,7 +93,7 @@ where
                 //TODO: frank_jwt does not validate things yet,
                 //we should either validate things here or patch frank_jwt
                 let auth_data = crate::AuthenticationData {
-                    header: header,
+                    header,
                     claims: crate::Claims {
                         all: claims.clone(),
                         sub: match claims.clone() {
@@ -118,15 +118,12 @@ where
                         },
                     },
                 };
-                match auth_data.claims.exp {
-                    Some(exp) => {
-                        if Utc.timestamp(exp, 0) > Utc::now() {
-                            return Either::A(ok(req.into_response(
-                                actix_web::HttpResponse::Unauthorized().finish().into_body(),
-                            )));
-                        }
+                if let Some(exp) = auth_data.claims.exp {
+                    if Utc.timestamp(exp, 0) > Utc::now() {
+                        return Either::A(ok(req.into_response(
+                            actix_web::HttpResponse::Unauthorized().finish().into_body(),
+                        )));
                     }
-                    _ => (),
                 }
                 req.extensions_mut().insert(auth_data);
                 Either::B(self.service.call(req))

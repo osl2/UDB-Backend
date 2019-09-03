@@ -1,4 +1,4 @@
-use crate::models::{MCSolution, PlaintextSolution, SQLSolution, Solution, AllowedSQL};
+use crate::models::{AllowedSQL, MCSolution, PlaintextSolution, SQLSolution, Solution};
 use diesel::backend::Backend;
 use diesel::deserialize::FromSql;
 use diesel::serialize::{IsNull, Output, ToSql};
@@ -37,9 +37,9 @@ impl Content {
     pub fn get_solution(&self) -> Option<Solution> {
         match self {
             Content::SQL { solution, .. } => match solution {
-                    Some(solution) => Some(Solution::SQL(solution.clone())),
-                    None => None,
-                },
+                Some(solution) => Some(Solution::SQL(solution.clone())),
+                None => None,
+            },
             Content::MC { solution, .. } => match solution {
                 Some(solution) => Some(Solution::MultipleChoice(solution.clone())),
                 None => None,

@@ -1,6 +1,6 @@
 use crate::models::{
-    MCSolutionResult, PlaintextSolutionResult, SQLSolutionResult, Solution, SolutionResult, Subtask,
-    Content
+    Content, MCSolutionResult, PlaintextSolutionResult, SQLSolutionResult, Solution,
+    SolutionResult, Subtask,
 };
 
 pub fn rows_equal(row1: &[String], row2: &[String]) -> bool {
@@ -16,7 +16,6 @@ pub fn rows_equal(row1: &[String], row2: &[String]) -> bool {
 }
 
 pub fn compare_solutions(student_solution: Solution, subtask: Subtask) -> SolutionResult {
-
     let teacher_solution = subtask.content.get_solution().unwrap();
 
     match (student_solution, teacher_solution) {
@@ -29,20 +28,25 @@ pub fn compare_solutions(student_solution: Solution, subtask: Subtask) -> Soluti
             let mut missed_rows: Vec<Vec<String>> = Vec::new();
 
             // if row order matters, comparison is straightforward
-            match subtask.content {
-                Content::SQL { row_order_matters: true, .. } => {
-                    for (student_row, teacher_row) in student_solution.rows.iter().zip(teacher_solution.rows.iter()) {
-                        if !rows_equal(student_row, teacher_row) {
-                            wrong_rows.push(student_row.clone());
-                        }
+            if let Content::SQL {
+                row_order_matters: true,
+                ..
+            } = subtask.content
+            {
+                for (student_row, teacher_row) in student_solution
+                    .rows
+                    .iter()
+                    .zip(teacher_solution.rows.iter())
+                {
+                    if !rows_equal(student_row, teacher_row) {
+                        wrong_rows.push(student_row.clone());
                     }
-                    return SolutionResult::SQL(SQLSolutionResult {
-                        correct: wrong_rows.is_empty(),
-                        wrong_rows,
-                        missed_rows,
-                    })
-                },
-                _ => {}
+                }
+                return SolutionResult::SQL(SQLSolutionResult {
+                    correct: wrong_rows.is_empty(),
+                    wrong_rows,
+                    missed_rows,
+                });
             }
             // row order does not matter:
 
@@ -125,7 +129,7 @@ pub fn compare_solutions(student_solution: Solution, subtask: Subtask) -> Soluti
 mod tests {
     use crate::models::{SQLSolution, Solution};
     use crate::solution_compare;
-    use upowdb_models::models::{Subtask, Content, SolutionResult, AllowedSQL};
+    use upowdb_models::models::{AllowedSQL, Content, SolutionResult, Subtask};
 
     /// Creates a mock sqltask with given options
     fn new_sqltask(row_order_matters: bool, solution: SQLSolution) -> Subtask {
@@ -181,12 +185,13 @@ mod tests {
                     as_strings(vec!["6", "Bill", "33"]),
                     as_strings(vec!["2", "Bob", "32"]),
                 ],
-        });
+            },
+        );
 
         match solution_compare::compare_solutions(solution, subtask) {
             SolutionResult::SQL(result) => {
                 assert_eq!(result.correct, true);
-            },
+            }
             _ => panic!("Wrong solution type"),
         }
     }
@@ -215,14 +220,21 @@ mod tests {
                     as_strings(vec!["6", "Bill", "33"]),
                     as_strings(vec!["3", "Charlie", "5"]),
                 ],
-            });
+            },
+        );
 
         match solution_compare::compare_solutions(solution, subtask) {
             SolutionResult::SQL(result) => {
                 assert_eq!(result.correct, false);
-                assert_eq!(result.missed_rows, vec![as_strings(vec!["6", "Bill", "33"])]);
-                assert_eq!(result.wrong_rows, vec![as_strings(vec!["4", "David", "21"])]);
-            },
+                assert_eq!(
+                    result.missed_rows,
+                    vec![as_strings(vec!["6", "Bill", "33"])]
+                );
+                assert_eq!(
+                    result.wrong_rows,
+                    vec![as_strings(vec!["4", "David", "21"])]
+                );
+            }
             _ => panic!("Wrong solution type"),
         }
     }
@@ -251,12 +263,13 @@ mod tests {
                     as_strings(vec!["6", "Bill", "33"]),
                     as_strings(vec!["3", "Charlie", "5"]),
                 ],
-            });
+            },
+        );
 
         match solution_compare::compare_solutions(solution, subtask) {
             SolutionResult::SQL(result) => {
                 assert_eq!(result.correct, true);
-            },
+            }
             _ => panic!("Wrong solution type"),
         }
     }
@@ -285,12 +298,13 @@ mod tests {
                     as_strings(vec!["6", "Bill", "33"]),
                     as_strings(vec!["3", "Charlie", "5"]),
                 ],
-            });
+            },
+        );
 
         match solution_compare::compare_solutions(solution, subtask) {
             SolutionResult::SQL(result) => {
                 assert_eq!(result.correct, false);
-            },
+            }
             _ => panic!("Wrong solution type"),
         }
     }
