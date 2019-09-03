@@ -1,2 +1,3 @@
 -- Your SQL goes here
-ALTER TABLE databases ALTER COLUMN name DROP UNIQUE;
+ALTER TABLE databases DROP CONSTRAINT databases_name_key;
+DROP INDEX IF EXISTS databases_name_key;

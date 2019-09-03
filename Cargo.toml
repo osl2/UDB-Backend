@@ -35,3 +35,6 @@ actix-web-httpauth = "0.3.2"
 upowdb-models = { path = "upowdb-models" }
 r2d2 = "0.8.5"
 diesel_migrations = "1.4.0"
+
+[patch.crates-io]
+migrations_internals = { git = "https://github.com/diesel-rs/diesel" }
