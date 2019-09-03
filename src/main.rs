@@ -6,6 +6,9 @@ use regex::Regex;
 
 use actix_web_jwt_middleware::{Algorithm, JwtAuthentication, JwtKey};
 
+#[macro_use]
+extern crate diesel_migrations;
+
 pub use upowdb_models::{models, schema};
 
 mod alias_generator;
@@ -20,13 +23,25 @@ mod solution_compare;
 #[derive(Clone)]
 struct AppData {
     settings: settings::Settings,
+    database: database::Database,
 }
 
 impl AppData {
-    pub fn from_configuration(config: settings::Settings) -> Self {
-        Self { settings: config }
+    pub fn from_configuration(
+        config: settings::Settings,
+    ) -> Result<Self, database::DatabaseConnectionError> {
+        let database = config.db_connection.create_database()?;
+        Ok(Self {
+            settings: config,
+            database,
+        })
     }
 }
+
+#[cfg(all(feature = "postgres", not(feature = "sqlite")))]
+embed_migrations!("migrations/postgresql");
+#[cfg(all(feature = "sqlite", not(feature = "postgres")))]
+embed_migrations!("migrations/sqlite");
 
 #[cfg(any(feature = "sqlite", feature = "postgres"))]
 fn main() {
@@ -42,26 +57,33 @@ fn main() {
         settings::Settings::new(cli_matches.value_of("config").unwrap_or("config.toml")).unwrap();
     let sys = actix::System::new("udb-backend");
 
-    let appstate = AppData::from_configuration(configuration.clone());
-
-    let pool = match appstate.settings.db_connection.create_connection_pool() {
-        Ok(pool) => pool,
+    let appstate = match AppData::from_configuration(configuration.clone()) {
+        Ok(appstate) => appstate,
         Err(error) => {
             match error {
                 database::DatabaseConnectionError::IncompatibleBuild => {
                     error!("The database you configured is not compatible with this build.")
                 }
-                database::DatabaseConnectionError::Diesel(error) => {
-                    error!("Something went wrong connecting to the database: {:?}", error)
-                }
-                database::DatabaseConnectionError::R2D2(error) => {
-                    error!("Something went wrong creating the connection pool: {:?}", error)
-                }
+                database::DatabaseConnectionError::Diesel(error) => error!(
+                    "Something went wrong connecting to the database: {:?}",
+                    error
+                ),
+                database::DatabaseConnectionError::R2D2(error) => error!(
+                    "Something went wrong creating the connection pool: {:?}",
+                    error
+                ),
             };
             return;
         }
     };
 
+    match embedded_migrations::run(&appstate.database.get_connection().unwrap()) {
+        Ok(_) => {},
+        Err(error) => {
+            error!("Couldn't run database migrations: {:?}", error);
+            return;
+        }
+    }
     let jwt_key = configuration.jwt_key.clone();
     let mut server = HttpServer::new(move || {
         App::new()
@@ -100,7 +122,7 @@ fn main() {
                 )],
             })
             .wrap(middlewares::db_connection::DatabaseConnection {
-                pool: pool.clone()
+                database: appstate.database.clone()
             })
             .wrap({
                 let cors = Cors::new();

@@ -34,3 +34,4 @@ base64 = "0.10.1"
 actix-web-httpauth = "0.3.2"
 upowdb-models = { path = "upowdb-models" }
 r2d2 = "0.8.5"
+diesel_migrations = "1.4.0"

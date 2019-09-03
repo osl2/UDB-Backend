@@ -1,2 +1,2 @@
 #!/bin/sh
-diesel migration run && upowdb-backend -vvv
+upowdb-backend -vvv
