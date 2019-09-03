@@ -47,17 +47,17 @@ where
     }
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        let uuid_result = match req
+        let uuid_result = match dbg!(req
             .extensions()
-            .get::<actix_web_jwt_middleware::AuthenticationData>()
+            .get::<actix_web_jwt_middleware::AuthenticationData>())
         {
             Some(auth_data) => Some(uuid::Uuid::parse_str(
                 &&(*auth_data).clone().claims.sub.clone().unwrap(),
-            )),
+            ).unwrap()),
             None => None,
         };
 
-        match uuid_result {
+        match dbg!(uuid_result) {
             Some(uuid) => {
                 req.extensions_mut().insert(uuid);
                 self.service.call(req)

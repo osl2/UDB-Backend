@@ -1,6 +1,3 @@
-use uuid::Uuid;
-use std::str::FromStr;
-
 pub fn internal_server_error(message: String) -> actix_web::HttpResponse {
     log::error!("{}", message);
     if cfg!(debug_assertions) {
@@ -15,11 +12,5 @@ pub fn database(req: &actix_web::HttpRequest) -> crate::database::Database {
 }
 
 pub fn user(req: &actix_web::HttpRequest) -> uuid::Uuid {
-    Uuid::from_str(&req.extensions().get::<actix_web_jwt_middleware::AuthenticationData>()
-        .unwrap()
-        .claims
-        .sub
-        .clone()
-        .unwrap()
-    ).unwrap()
+    req.extensions().get::<uuid::Uuid>().unwrap().clone()
 }
