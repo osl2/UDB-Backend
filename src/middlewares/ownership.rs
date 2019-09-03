@@ -95,13 +95,13 @@ where
 
         match result {
             Ok(_) => Either::A(self.service.call(req)),
-            Err(_) => Either::B(ok(
-                req.into_response(actix_web::HttpResponse::Forbidden().finish().into_body())
+            Err(error) => Either::B(ok(
+                req.into_response(actix_web::HttpResponse::Forbidden().body(format!("No access to resource: {:?}", error)).into_body())
             )),
         }
     }
 }
-
+#[derive(Debug)]
 enum OwnershipCheckerError {
     Undefined,
     NoAccess,
