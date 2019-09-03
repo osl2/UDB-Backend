@@ -40,7 +40,7 @@ impl AppData {
 }
 
 #[cfg(all(feature = "postgres", not(feature = "sqlite")))]
-embed_migrations!("migrations/postgresql");
+embed_migrations!("migrations/postgres");
 #[cfg(all(feature = "sqlite", not(feature = "postgres")))]
 embed_migrations!("migrations/sqlite");
 
