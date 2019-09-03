@@ -44,34 +44,74 @@ impl From<diesel::ConnectionError> for DatabaseConnectionError {
 impl DatabaseConnectionConfig {
     #[cfg(any(feature = "sqlite", feature = "postgres"))]
     pub fn create_connection_pool(&self) -> Result<r2d2::Pool<ConnectionManager<DatabaseConnection>>, DatabaseConnectionError> {
+    pub fn create_database(&self) -> Result<Database, DatabaseConnectionError> {
         match self {
             DatabaseConnectionConfig::SQLiteFile { file } => {
                 if cfg!(feature = "sqlite") {
-                    Ok(r2d2::Pool::builder()
-                        .max_size(15)
-                        .build(ConnectionManager::<DatabaseConnection>::new(&file.clone()))?)
+                    Ok(Database::new(r2d2::Pool::builder().max_size(15).build(
+                        ConnectionManager::<DatabaseConnection>::new(&file.clone()),
+                    )?))
                 } else {
                     Err(DatabaseConnectionError::IncompatibleBuild)
                 }
             }
             DatabaseConnectionConfig::SQLiteInMemory => {
                 if cfg!(feature = "sqlite") {
-                    Ok(r2d2::Pool::builder()
-                        .max_size(15)
-                        .build(ConnectionManager::<DatabaseConnection>::new(":memory:"))?)
+                    Ok(Database::new(r2d2::Pool::builder().max_size(15).build(
+                        ConnectionManager::<DatabaseConnection>::new(":memory:"),
+                    )?))
                 } else {
                     Err(DatabaseConnectionError::IncompatibleBuild)
                 }
             }
             DatabaseConnectionConfig::Postgres { uri } => {
                 if cfg!(feature = "postgres") {
-                    Ok(r2d2::Pool::builder()
-                        .max_size(15)
-                        .build(ConnectionManager::<DatabaseConnection>::new(uri))?)
+                    Ok(Database::new(r2d2::Pool::builder().max_size(15).build(
+                        ConnectionManager::<DatabaseConnection>::new(uri),
+                    )?))
                 } else {
                     Err(DatabaseConnectionError::IncompatibleBuild)
                 }
             }
         }
     }
+}
+
+#[derive(Clone)]
+pub struct Database {
+    pool: r2d2::Pool<ConnectionManager<DatabaseConnection>>,
+}
+
+impl Database {
+    pub fn new(pool: r2d2::Pool<ConnectionManager<DatabaseConnection>>) -> Self {
+        Self { pool }
+    }
+    pub fn get_connection(
+        &self,
+    ) -> Result<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>, r2d2::Error> {
+        self.pool.get()
+    }
+}
+
+#[derive(Debug)]
+pub enum DatabaseError {
+    R2D2(r2d2::Error),
+    Diesel(diesel::result::Error),
+    Other(OtherErrorKind),
+}
+
+impl From<r2d2::Error> for DatabaseError {
+    fn from(error: r2d2::Error) -> Self {
+        Self::R2D2(error)
+    }
+}
+
+impl From<diesel::result::Error> for DatabaseError {
+    fn from(error: diesel::result::Error) -> Self {
+        Self::Diesel(error)
+    }
+}
+
+#[derive(Debug)]
+pub enum OtherErrorKind {
 }
