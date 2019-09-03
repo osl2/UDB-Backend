@@ -1,10 +1,9 @@
-use crate::{models, schema, database::DatabaseConnection};
+use crate::{
+    models,
+    util::{database, internal_server_error, user},
+};
 use actix_web::{dev::ServiceRequest, web, Error, HttpMessage, HttpRequest, HttpResponse, Scope};
 use actix_web_httpauth::{extractors::basic::BasicAuth, middleware::HttpAuthentication};
-use diesel::{
-    r2d2::{self, ConnectionManager},
-    Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
-};
 use futures::future::{self, Future, FutureResult, IntoFuture};
 use serde_json::json;
 use uuid::Uuid;
@@ -13,13 +12,11 @@ pub fn get_scope() -> Scope {
     let validator =
         |req: ServiceRequest, credentials: BasicAuth| -> FutureResult<ServiceRequest, Error> {
             let result: Result<Uuid, _> = (|| {
-                let extensions = req.extensions();
-                let conn = extensions
-                    .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-                    .unwrap();
-                let user = schema::users::table
-                    .filter(schema::users::name.eq(credentials.user_id()))
-                    .get_result::<models::User>(&*conn)?;
+                let user = req
+                    .app_data::<crate::AppData>()
+                    .unwrap()
+                    .database
+                    .get_user_by_name(credentials.user_id().to_string())?;
                 let password = credentials
                     .password()
                     .ok_or(BasicAuthError::WrongPwError)
@@ -64,16 +61,17 @@ pub fn get_scope() -> Scope {
                 .wrap(auth)
                 .route(web::post().to_async(login)),
         )
+        .service(web::resource("/housekeeping").route(web::post().to_async(clean_up_account)))
 }
 
 enum BasicAuthError {
-    UserLoadingError(diesel::result::Error),
+    UserLoadingError(crate::database::DatabaseError),
     InvalidUserID,
     WrongPwError,
 }
 
-impl From<diesel::result::Error> for BasicAuthError {
-    fn from(err: diesel::result::Error) -> BasicAuthError {
+impl From<crate::database::DatabaseError> for BasicAuthError {
+    fn from(err: crate::database::DatabaseError) -> BasicAuthError {
         BasicAuthError::UserLoadingError(err)
     }
 }
@@ -85,24 +83,21 @@ impl From<uuid::parser::ParseError> for BasicAuthError {
 }
 
 fn get_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-    let user = extensions.get::<Uuid>().unwrap();
-
-    match schema::users::table
-        .find(format!("{}", user))
-        .get_result::<models::User>(&*conn)
-    {
+    match database(&req).get_user_by_id(*req.extensions().get::<Uuid>().unwrap()) {
         Ok(result) => {
             Box::new(Ok(HttpResponse::Ok().json(result.returnable_userdata())).into_future())
         }
-        Err(e) => match e {
-            diesel::result::Error::NotFound => {
+        Err(error) => match error {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::NotFound) => {
                 Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
             }
-            _ => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
+            error => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't load user: {:?}",
+                    error
+                )))
+                .into_future(),
+            ),
         },
     }
 }
@@ -110,55 +105,61 @@ fn update_account(
     req: HttpRequest,
     json: web::Json<models::Account>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-    let user = extensions.get::<Uuid>().unwrap();
-    let account_template = json.into_inner();
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
-        diesel::update(schema::users::table.find(format!("{}", user)))
-            .set(models::User::new(
-                account_template.username,
-                account_template.password,
-                Some(*user),
-            ))
-            .execute(&*conn)?;
-        Ok(())
-    }) {
+    match database(&req).update_account(*req.extensions().get::<Uuid>().unwrap(), json.into_inner())
+    {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
-        Err(_) => {
-            Box::new(Ok(HttpResponse::BadRequest().body("Username already taken")).into_future())
-        }
+        Err(error) => match error {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::UniqueViolation,
+                _,
+            )) => Box::new(
+                Ok(HttpResponse::BadRequest().body("Username already taken")).into_future(),
+            ),
+            error => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't update user: {:?}",
+                    error
+                )))
+                .into_future(),
+            ),
+        },
     }
 }
 fn create_account(
     req: HttpRequest,
     json: web::Json<models::Account>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-    let account_template = json.into_inner();
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
-        diesel::insert_into(schema::users::table)
-            .values(models::User::new(
-                account_template.username,
-                account_template.password,
-                None,
-            ))
-            .execute(&*conn)?;
-        Ok(())
-    }) {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
-        Err(_) => {
-            Box::new(Ok(HttpResponse::BadRequest().body("Username already taken")).into_future())
-        }
+    match database(&req).create_account(json.into_inner()) {
+        Ok(_) => Box::new(Ok(HttpResponse::Created().finish()).into_future()),
+        Err(error) => match error {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::UniqueViolation,
+                _,
+            )) => Box::new(
+                Ok(HttpResponse::BadRequest().body("Username already taken")).into_future(),
+            ),
+            error => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't create user: {:?}",
+                    error
+                )))
+                .into_future(),
+            ),
+        },
     }
 }
 fn delete_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().body(format!("{:?}", req))).into_future())
+    let user = req.extensions().get::<Uuid>().unwrap().clone();
+    match database(&req).delete_account(user) {
+        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Err(error) => Box::new(
+            Ok(internal_server_error(format!(
+                "Couldn't delete user: {:?}",
+                error
+            )))
+            .into_future(),
+        ),
+    }
 }
 fn login(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let appdata: &crate::AppData = req.app_data().unwrap();
@@ -174,6 +175,15 @@ fn login(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>
         Ok(token) => Box::new(Ok(HttpResponse::Ok().json(json!({ "token": token }))).into_future()),
         Err(e) => {
             log::error!("Couldn't encode JWT: {:?}", e);
+            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+        }
+    }
+}
+fn clean_up_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+    match database(&req).delete_stale_objects(user(&req)) {
+        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Err(e) => {
+            log::error!("Couldn't delete task: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }

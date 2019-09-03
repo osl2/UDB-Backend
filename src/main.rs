@@ -19,6 +19,7 @@ mod logging;
 mod middlewares;
 mod settings;
 mod solution_compare;
+mod util;
 
 #[derive(Clone)]
 struct AppData {
@@ -84,12 +85,14 @@ fn main() {
             return;
         }
     }
+
     let jwt_key = configuration.jwt_key.clone();
     let mut server = HttpServer::new(move || {
         App::new()
             .data(appstate.clone())
             .wrap(middlewares::upload_filter::UploadFilter { filter: false })
             .wrap(middlewares::ownership::OwnershipChecker{})
+            .wrap(middlewares::auth_to_uuid::AuthToUuid{})
             .wrap(JwtAuthentication {
                 key: JwtKey::Inline(jwt_key.clone()),
                 algorithm: Algorithm::HS512,

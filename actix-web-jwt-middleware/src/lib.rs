@@ -8,11 +8,13 @@ pub enum JwtKey {
     File(PathBuf),
 }
 
+#[derive(Clone)]
 pub struct AuthenticationData {
     pub header: serde_json::Value,
     pub claims: Claims,
 }
 
+#[derive(Clone)]
 pub struct Claims {
     pub sub: Option<String>,
     pub exp: Option<i64>,

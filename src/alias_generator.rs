@@ -1,5 +1,5 @@
-use rand;
 use self::rand::seq::SliceRandom;
+use rand;
 use rand::thread_rng;
 use std::fs::File;
 use std::io::{BufRead, BufReader};

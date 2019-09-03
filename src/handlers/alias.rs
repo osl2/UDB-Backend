@@ -1,12 +1,7 @@
-use crate::alias_generator::AliasGenerator;
-use crate::{models, schema, database::DatabaseConnection};
+use crate::models;
+use crate::util::{database, internal_server_error};
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
-use diesel::{
-    r2d2::{self, ConnectionManager},
-    Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
-};
 use futures::future::{Future, IntoFuture};
-use lazy_static::lazy_static;
 use uuid::Uuid;
 
 pub fn get_scope() -> Scope {
@@ -20,54 +15,26 @@ fn create_alias(
     req: HttpRequest,
     json: web::Json<models::AliasRequest>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-
-    match conn.transaction::<String, AliasError, _>(|| {
-        let alias_req = json.into_inner();
-        lazy_static! {
-            static ref GENERATOR: AliasGenerator = AliasGenerator::default();
-        }
-        let mut alias = models::Alias {
-            alias: GENERATOR.generate(4),
-            object_id: alias_req.object_id,
-            object_type: alias_req.object_type,
-        };
-        // Try to find a free alias 20 times
-        for i in 0..20 {
-            match diesel::insert_into(schema::aliases::table)
-                .values(alias.clone())
-                .execute(&*conn)
-            {
-                Ok(_) => return Ok(alias.alias),
-                Err(e) => match e {
-                    diesel::result::Error::DatabaseError(
-                        diesel::result::DatabaseErrorKind::ForeignKeyViolation,
-                        _,
-                    )
-                    | diesel::result::Error::DatabaseError(
-                        diesel::result::DatabaseErrorKind::UniqueViolation,
-                        _,
-                    ) => {
-                        // Try to find a four word alias for five times, then five words for five times,
-                        // then six for five times and then seven for five times.
-                        alias.alias = GENERATOR.generate(4 + i / 5);
-                    }
-                    e => return Err(AliasError::from(e)),
-                },
-            }
-        }
-        Err(AliasError::NoFreeAliases)
-    }) {
-        Ok(alias) => Box::new(Ok(HttpResponse::Ok().body(alias)).into_future()),
+    match database(&req).create_alias(json.into_inner()) {
+        Ok(alias) => Box::new(Ok(HttpResponse::Created().body(alias)).into_future()),
         Err(e) => match e {
-            AliasError::Diesel(e) => {
-                log::error!("Couldn't create new alias: {:?}", e);
-                Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-            }
-            AliasError::NoFreeAliases => Box::new(
+            crate::database::DatabaseError::Diesel(e) => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't create new alias: {:?}",
+                    e
+                )))
+                .into_future(),
+            ),
+            crate::database::DatabaseError::R2D2(e) => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't create new alias: {:?}",
+                    e
+                )))
+                .into_future(),
+            ),
+            crate::database::DatabaseError::Other(
+                crate::database::OtherErrorKind::NoFreeAliases,
+            ) => Box::new(
                 Ok(HttpResponse::InternalServerError().body("Couldn't find a free alias."))
                     .into_future(),
             ),
@@ -75,35 +42,24 @@ fn create_alias(
     }
 }
 
-enum AliasError {
-    Diesel(diesel::result::Error),
-    NoFreeAliases,
-}
-
-impl From<diesel::result::Error> for AliasError {
-    fn from(val: diesel::result::Error) -> AliasError {
-        AliasError::Diesel(val)
-    }
-}
-
 fn get_alias(
     req: HttpRequest,
     id: web::Path<Uuid>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-
-    match schema::aliases::table
-        .filter(schema::aliases::object_id.eq(format!("{}", id)))
-        .get_result::<models::Alias>(&*conn)
-    {
+    match database(&req).get_alias_by_uuid(id.into_inner()) {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
-        Err(e) => {
-            log::error!("Couldn't get alias: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+        Err(error) => match error {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::NotFound) => {
+                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
+            }
+            error => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't get alias: {:?}",
+                    error
+                )))
+                .into_future(),
+            ),
+        },
     }
 }
 
@@ -111,19 +67,19 @@ fn get_uuid(
     req: HttpRequest,
     alias: web::Path<String>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-
-    match schema::aliases::table
-        .filter(schema::aliases::alias.eq(format!("{}", alias)))
-        .get_result::<models::Alias>(&*conn)
-    {
+    match database(&req).get_uuid_by_alias(alias.into_inner()) {
         Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
-        Err(e) => {
-            log::error!("Couldn't get uuid: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().body(format!("Couldn't get uuid: {}", e))).into_future())
-        }
+        Err(error) => match error {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::NotFound) => {
+                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
+            }
+            error => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't get uuid: {:?}",
+                    error
+                )))
+                .into_future(),
+            ),
+        },
     }
 }

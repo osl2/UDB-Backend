@@ -1,13 +1,12 @@
-use crate::{models, schema, database::DatabaseConnection};
+use crate::{
+    models,
+    util::{database, internal_server_error, user},
+};
 use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
 
 use futures::future::{Future, IntoFuture};
 use uuid::Uuid;
 
-use diesel::{
-    r2d2::{self, ConnectionManager},
-    Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl,
-};
 pub fn get_scope() -> Scope {
     web::scope("/tasks")
         .service(
@@ -24,51 +23,10 @@ pub fn get_scope() -> Scope {
 }
 
 fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-    let sub = extensions
-        .get::<actix_web_jwt_middleware::AuthenticationData>()
-        .unwrap()
-        .claims
-        .sub
-        .clone()
-        .unwrap();
-
-    match schema::tasks::table
-        .inner_join(
-            schema::access::table
-                .on(schema::tasks::columns::id.eq(schema::access::columns::object_id)),
-        )
-        .filter(schema::access::columns::user_id.eq(sub))
-        .select((
-            schema::tasks::columns::id,
-            schema::tasks::columns::database_id,
-            schema::tasks::columns::name,
-        ))
-        .load::<models::QueryableTask>(&*conn)
-    {
-        Ok(query_tasks) => {
-            let mut tasks: Vec<models::Task> = Vec::new();
-            for task in query_tasks {
-                let subtasks_query = schema::subtasks_in_tasks::table
-                    .filter(schema::subtasks_in_tasks::columns::task_id.eq(&task.id))
-                    .select(schema::subtasks_in_tasks::columns::subtask_id)
-                    .order(schema::subtasks_in_tasks::position)
-                    .load::<String>(&*conn);
-                tasks.push(models::Task {
-                    id: task.id,
-                    name: task.name,
-                    database_id: task.database_id.unwrap_or("".to_string()),
-                    subtasks: subtasks_query.unwrap(),
-                });
-            }
-            Box::new(Ok(HttpResponse::Ok().json(tasks)).into_future())
-        }
+    match database(&req).get_tasks(user(&req)) {
+        Ok(tasks) => Box::new(Ok(HttpResponse::Ok().json(tasks)).into_future()),
         Err(e) => {
-            log::error!("Couldn't get tasks: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            Box::new(internal_server_error(format!("Couldn't get tasks: {:?}", e)).into_future())
         }
     }
 }
@@ -77,56 +35,15 @@ fn create_task(
     req: HttpRequest,
     json: web::Json<models::Task>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-    let sub = extensions
-        .get::<actix_web_jwt_middleware::AuthenticationData>()
-        .unwrap()
-        .claims
-        .sub
-        .clone()
-        .unwrap();
-
-    match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
-        // create task object
-        let mut task = json.into_inner();
-        let task_id = Uuid::new_v4();
-        task.id = task_id.to_string();
-        let new_task = models::QueryableTask::from_task(task.clone());
-
-        // insert access for user
-        diesel::insert_into(schema::access::table)
-            .values(models::Access {
-                user_id: sub,
-                object_id: task_id.to_string(),
-            })
-            .execute(&*conn)?;
-
-        // set subtasks belonging to task
-        for (position, subtask_id) in task.subtasks.iter().enumerate() {
-            diesel::insert_into(schema::subtasks_in_tasks::table)
-                .values(models::SubtasksInTask {
-                    subtask_id: subtask_id.to_string(),
-                    task_id: task_id.to_string(),
-                    position: position as i32,
-                })
-                .execute(&*conn)?;
-        }
-
-        // insert task object
-        diesel::insert_into(schema::tasks::table)
-            .values(new_task)
-            .execute(&*conn)?;
-
-        Ok(task_id)
-    }) {
-        Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
-        Err(e) => {
-            log::error!("Couldn't create task: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+    match database(&req).create_task(user(&req), json.into_inner()) {
+        Ok(id) => Box::new(Ok(HttpResponse::Created().body(id.to_string())).into_future()),
+        Err(e) => Box::new(
+            Ok(internal_server_error(format!(
+                "Couldn't create task: {:?}",
+                e
+            )))
+            .into_future(),
+        ),
     }
 }
 
@@ -134,40 +51,19 @@ fn get_task(
     req: HttpRequest,
     id: web::Path<Uuid>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-
-    match schema::tasks::table
-        .find(format!("{}", id))
-        .get_result::<models::QueryableTask>(&*conn)
-    {
-        Ok(task) => {
-            let subtasks_query = schema::subtasks_in_tasks::table
-                .filter(schema::subtasks_in_tasks::columns::task_id.eq(format!("{}", id)))
-                .select(schema::subtasks_in_tasks::columns::subtask_id)
-                .order(schema::subtasks_in_tasks::position)
-                .load::<String>(&*conn);
-
-            Box::new(
-                Ok(HttpResponse::Ok().json(models::Task {
-                    id: task.id,
-                    name: task.name,
-                    database_id: task.database_id.unwrap_or("".to_string()),
-                    subtasks: subtasks_query.unwrap(),
-                }))
-                .into_future(),
-            )
-        }
+    match database(&req).get_task(id.into_inner()) {
+        Ok(task) => Box::new(Ok(HttpResponse::Ok().json(task)).into_future()),
         Err(e) => match e {
-            diesel::result::Error::NotFound => {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::NotFound) => {
                 Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
             }
-            e => {
-                log::error!("Couldn't load task: {:?}", e);
-                Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-            }
+            e => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't load task: {:?}",
+                    e
+                )))
+                .into_future(),
+            ),
         },
     }
 }
@@ -177,51 +73,20 @@ fn update_task(
     id: web::Path<Uuid>,
     json: web::Json<models::Task>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
-        let task = json.into_inner();
-
-        // update tasks
-        diesel::update(schema::tasks::table.find(format!("{}", id)))
-            .set(models::QueryableTask::from_task(task.clone()))
-            .execute(&*conn)?;
-
-        // update which subtasks belong to this task
-        diesel::delete(
-            schema::subtasks_in_tasks::table
-                .filter(schema::subtasks_in_tasks::task_id.eq(task.id.clone())),
-        )
-        .execute(&*conn)?;
-        let mut pos = -1;
-        let task_id = task.id.clone();
-        let subtasks_in_task: Vec<models::SubtasksInTask> = task
-            .subtasks
-            .iter()
-            .map(|subtask_id| {
-                pos += 1;
-                models::SubtasksInTask {
-                    subtask_id: subtask_id.to_string(),
-                    task_id: task_id.clone(),
-                    position: pos,
-                }
-            })
-            .collect();
-        for subtask in subtasks_in_task {
-            diesel::insert_into(schema::subtasks_in_tasks::table)
-                .values(subtask)
-                .execute(&*conn)?;
-        }
-        Ok(())
-    }) {
+    match database(&req).update_task(id.into_inner(), json.into_inner(), user(&req)) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
-        Err(e) => {
-            log::error!("Couldn't update task: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+        Err(error) => match error {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::NotFound) => {
+                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
+            }
+            error => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't update task: {:?}",
+                    error
+                )))
+                .into_future(),
+            ),
+        },
     }
 }
 
@@ -229,35 +94,19 @@ fn delete_task(
     req: HttpRequest,
     id: web::Path<Uuid>,
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>()
-        .unwrap();
-
-    let uuid = id.into_inner();
-
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
-        diesel::delete(
-            schema::subtasks_in_tasks::table
-                .filter(schema::subtasks_in_tasks::task_id.eq(uuid.to_string())),
-        )
-        .execute(&*conn)?;
-        diesel::delete(
-            schema::tasks_in_worksheets::table
-                .filter(schema::tasks_in_worksheets::task_id.eq(uuid.to_string())),
-        )
-        .execute(&*conn)?;
-        diesel::delete(
-            schema::access::table.filter(schema::access::object_id.eq(uuid.to_string())),
-        )
-        .execute(&*conn)?;
-        diesel::delete(schema::tasks::table.find(format!("{}", uuid))).execute(&*conn)?;
-        Ok(())
-    }) {
+    match database(&req).delete_task(id.into_inner(), user(&req)) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
-        Err(e) => {
-            log::error!("Couldn't delete task: {:?}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
-        }
+        Err(error) => match error {
+            crate::database::DatabaseError::Diesel(diesel::result::Error::NotFound) => {
+                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
+            }
+            error => Box::new(
+                Ok(internal_server_error(format!(
+                    "Couldn't delete task: {:?}",
+                    error
+                )))
+                .into_future(),
+            ),
+        },
     }
 }
