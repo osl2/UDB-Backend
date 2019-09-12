@@ -3,7 +3,7 @@ use base64::encode;
 
 fn main() -> Result<(), Box<std::error::Error>> {
     let origin = "https://staging.upowdb.xyz";
-    let basepath = "http://localhost:8082/api/v1";
+    let basepath = "http://10.214.227.119:8082/api/v1";
     let username = "elite_admin";
     let password = "2342";
 
@@ -116,7 +116,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
         content: encode(&database_bytes[0..database_bytes.len()]),
     };
 
-    let database_id = client.post(&format!("{}/databases", basepath)).json(&database).send()?.text()?;
+    let database_id = dbg!(client.post(&format!("{}/databases", basepath)).json(&database).send()?.text()?);
 
     let task = models::Task {
         database_id,
@@ -125,7 +125,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
         subtasks: subtask_ids,
     };
 
-    let task_id = client.post(&format!("{}/tasks", basepath)).json(&task).send()?.text()?;
+    let task_id = dbg!(client.post(&format!("{}/tasks", basepath)).json(&task).send()?.text()?);
 
     let worksheet = models::Worksheet {
         id: "".to_string(),
@@ -136,7 +136,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
     };
 
-    let worksheet_id = client.post(&format!("{}/worksheets", basepath)).json(&worksheet).send()?.text()?;
+    let worksheet_id = dbg!(client.post(&format!("{}/worksheets", basepath)).json(&worksheet).send()?.text()?);
 
     let course = models::Course {
         id: "".to_string(),
@@ -145,7 +145,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
         worksheets: vec![worksheet_id],
     };
 
-    let course_id = client.post(&format!("{}/courses", basepath)).json(&course).send()?.text()?;
+    let course_id = dbg!(client.post(&format!("{}/courses", basepath)).json(&course).send()?.text()?);
 
     let alias_req = models::AliasRequest {
         object_id: course_id,
