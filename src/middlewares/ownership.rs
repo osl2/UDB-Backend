@@ -1,12 +1,9 @@
-use crate::{database::DatabaseConnection, schema};
+use crate::schema;
 use actix_web::{
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage,
 };
-use diesel::{
-    r2d2::{self, ConnectionManager},
-    ExpressionMethods, QueryDsl, RunQueryDsl,
-};
+use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
 use futures::{
     future::{ok, Either, FutureResult},
     Poll,
@@ -62,8 +59,12 @@ where
         };
         let result = {
             let extensions = req.extensions();
-            let conn =
-                extensions.get::<r2d2::PooledConnection<ConnectionManager<DatabaseConnection>>>().unwrap();
+            let conn = req
+                .app_data::<crate::AppData>()
+                .unwrap()
+                .database
+                .get_connection()
+                .unwrap();
             let token = extensions.get::<uuid::Uuid>();
 
             match req.method().as_str() {
@@ -89,7 +90,7 @@ where
                         error => {
                             log::error!("Couldn't query object access: {:?}", error);
                             Err(OwnershipCheckerError::Undefined)
-                        },
+                        }
                     }
                 }
                 _ => Ok(()),
@@ -98,9 +99,11 @@ where
 
         match result {
             Ok(_) => Either::A(self.service.call(req)),
-            Err(error) => Either::B(ok(
-                req.into_response(actix_web::HttpResponse::Forbidden().body(format!("No access to resource: {:?}", error)).into_body())
-            )),
+            Err(error) => Either::B(ok(req.into_response(
+                actix_web::HttpResponse::Forbidden()
+                    .body(format!("No access to resource: {:?}", error))
+                    .into_body(),
+            ))),
         }
     }
 }

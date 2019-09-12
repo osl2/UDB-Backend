@@ -79,7 +79,7 @@ fn main() {
     };
 
     match embedded_migrations::run(&appstate.database.get_connection().unwrap()) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(error) => {
             error!("Couldn't run database migrations: {:?}", error);
             return;
@@ -123,9 +123,6 @@ fn main() {
                     .unwrap(),
                     vec![Method::GET],
                 )],
-            })
-            .wrap(middlewares::db_connection::DatabaseConnection {
-                database: appstate.database.clone()
             })
             .wrap({
                 let cors = Cors::new();
