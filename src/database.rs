@@ -137,17 +137,17 @@ impl Database {
             let id = Uuid::new_v4();
             subtask.id = id.to_string();
 
+            // insert subtask object
+            diesel::insert_into(schema::subtasks::table)
+                .values(subtask)
+                .execute(&conn)?;
+
             // insert access for user
             diesel::insert_into(schema::access::table)
                 .values(models::Access {
                     user_id: user.to_string(),
                     object_id: id.to_string(),
                 })
-                .execute(&conn)?;
-
-            // insert subtask object
-            diesel::insert_into(schema::subtasks::table)
-                .values(subtask)
                 .execute(&conn)?;
 
             Ok(id)
@@ -260,6 +260,11 @@ impl Database {
             task.id = task_id.to_string();
             let new_task = models::QueryableTask::from_task(task.clone());
 
+            // insert task object
+            diesel::insert_into(schema::tasks::table)
+                .values(new_task)
+                .execute(&conn)?;
+
             // insert access for user
             diesel::insert_into(schema::access::table)
                 .values(models::Access {
@@ -278,11 +283,6 @@ impl Database {
                     })
                     .execute(&conn)?;
             }
-
-            // insert task object
-            diesel::insert_into(schema::tasks::table)
-                .values(new_task)
-                .execute(&conn)?;
 
             Ok(task_id)
         })?)
@@ -442,6 +442,11 @@ impl Database {
                 is_solution_online: worksheet.is_solution_online,
             };
 
+            // insert worksheet object
+            diesel::insert_into(schema::worksheets::table)
+                .values(new_worksheet)
+                .execute(&conn)?;
+
             // insert access for user
             diesel::insert_into(schema::access::table)
                 .values(models::Access {
@@ -460,11 +465,6 @@ impl Database {
                     })
                     .execute(&conn)?;
             }
-
-            // insert worksheet object
-            diesel::insert_into(schema::worksheets::table)
-                .values(new_worksheet)
-                .execute(&conn)?;
 
             Ok(worksheet_id)
         })?)
@@ -722,17 +722,17 @@ impl Database {
                 description: course.description,
             };
 
+            // insert course object
+            diesel::insert_into(schema::courses::table)
+                .values(new_course)
+                .execute(&conn)?;
+
             // insert access for user
             diesel::insert_into(schema::access::table)
                 .values(models::Access {
                     user_id: user.to_string(),
                     object_id: course_id.to_string(),
                 })
-                .execute(&conn)?;
-
-            // insert course object
-            diesel::insert_into(schema::courses::table)
-                .values(new_course)
                 .execute(&conn)?;
 
             // set worksheets belonging to course
@@ -860,17 +860,17 @@ impl Database {
             let id = Uuid::new_v4();
             database.id = id.to_string();
 
+            // insert database object
+            diesel::insert_into(schema::databases::table)
+                .values(database)
+                .execute(&conn)?;
+
             // insert access for user
             diesel::insert_into(schema::access::table)
                 .values(models::Access {
                     user_id: user.to_string(),
                     object_id: id.to_string(),
                 })
-                .execute(&conn)?;
-
-            // insert database object
-            diesel::insert_into(schema::databases::table)
-                .values(database)
                 .execute(&conn)?;
 
             Ok(id)
