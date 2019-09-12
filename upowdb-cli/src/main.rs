@@ -1,4 +1,5 @@
 use upowdb_models::models;
+use base64::encode;
 
 fn main() -> Result<(), Box<std::error::Error>> {
     let origin = "https://staging.upowdb.xyz";
@@ -107,8 +108,19 @@ fn main() -> Result<(), Box<std::error::Error>> {
     subtask_ids.push(dbg!(client.post(&format!("{}/subtasks", basepath)).json(&multiple_choice_subtask).send()?).text()?);
     println!("{:?}", subtask_ids);
 
+    let database_bytes = include_bytes!("../chinook.db");
+
+    let database = models::Database {
+        id: "".to_string(),
+        name: "chinook".to_string(),
+        content: encode(&database_bytes[0..database_bytes.len()]),
+    };
+
+    let database_id = client.post(&format!("{}/databases", basepath)).json(&database).send()?.text()?;
+
     let task = models::Task {
-        database_id: "005acaf8-c14e-41e2-b977-1b229f61b2d9".to_string(),
+        database_id,
+        name: None,
         id: "".to_string(),
         subtasks: subtask_ids,
     };

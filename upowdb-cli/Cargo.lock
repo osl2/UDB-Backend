@@ -1280,6 +1280,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "upowdb-cli"
 version = "0.1.0"
 dependencies = [
+ "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "upowdb-models 0.1.0",
