@@ -123,7 +123,7 @@ impl Database {
                 schema::subtasks::is_solution_verifiable,
                 schema::subtasks::content,
             ))
-            .load::<models::Subtask>(&*conn)?)
+            .load::<models::Subtask>(&conn)?)
     }
 
     pub fn create_subtask(
@@ -143,12 +143,12 @@ impl Database {
                     user_id: user.to_string(),
                     object_id: id.to_string(),
                 })
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             // insert subtask object
             diesel::insert_into(schema::subtasks::table)
                 .values(subtask)
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             Ok(id)
         })?)
@@ -158,7 +158,7 @@ impl Database {
         let conn = self.pool.get()?;
         Ok(schema::subtasks::table
             .find(subtask_id.to_string())
-            .get_result::<models::Subtask>(&*conn)?)
+            .get_result::<models::Subtask>(&conn)?)
     }
 
     pub fn update_subtask(
@@ -169,7 +169,7 @@ impl Database {
         let conn = self.pool.get()?;
         diesel::update(schema::subtasks::table.find(subtask_id.to_string()))
             .set(subtask)
-            .execute(&*conn)?;
+            .execute(&conn)?;
         Ok(())
     }
 
@@ -182,10 +182,10 @@ impl Database {
                     .filter(schema::access::object_id.eq(subtask_id.to_string()))
                     .filter(schema::access::user_id.eq(user.to_string())),
             )
-            .execute(&*conn)?;
+            .execute(&conn)?;
 
             // delete subtask
-            diesel::delete(schema::subtasks::table.find(subtask_id.to_string())).execute(&*conn)?;
+            diesel::delete(schema::subtasks::table.find(subtask_id.to_string())).execute(&conn)?;
             Ok(())
         })?)
     }
@@ -226,7 +226,7 @@ impl Database {
                 schema::tasks::columns::database_id,
                 schema::tasks::columns::name,
             ))
-            .load::<models::QueryableTask>(&*conn)?;
+            .load::<models::QueryableTask>(&conn)?;
         let mut tasks = Vec::new();
         for task in queryable_tasks {
             tasks.push(self.queryable_task_to_task(task)?);
@@ -243,7 +243,7 @@ impl Database {
             .filter(schema::subtasks_in_tasks::columns::task_id.eq(queryable_task.id.clone()))
             .select(schema::subtasks_in_tasks::columns::subtask_id)
             .order(schema::subtasks_in_tasks::position)
-            .load::<String>(&*conn)?;
+            .load::<String>(&conn)?;
         Ok(models::Task {
             id: queryable_task.id.clone(),
             name: queryable_task.name,
@@ -266,7 +266,7 @@ impl Database {
                     user_id: user.to_string(),
                     object_id: task_id.to_string(),
                 })
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             // set subtasks belonging to task
             for (position, subtask_id) in task.subtasks.iter().enumerate() {
@@ -276,13 +276,13 @@ impl Database {
                         task_id: task_id.to_string(),
                         position: position as i32,
                     })
-                    .execute(&*conn)?;
+                    .execute(&conn)?;
             }
 
             // insert task object
             diesel::insert_into(schema::tasks::table)
                 .values(new_task)
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             Ok(task_id)
         })?)
@@ -293,7 +293,7 @@ impl Database {
         Ok(self.queryable_task_to_task(
             schema::tasks::table
                 .find(task_id.to_string())
-                .get_result::<models::QueryableTask>(&*conn)?,
+                .get_result::<models::QueryableTask>(&conn)?,
         )?)
     }
 
@@ -310,14 +310,14 @@ impl Database {
             // update tasks
             diesel::update(schema::tasks::table.find(task_id.to_string()))
                 .set(models::QueryableTask::from_task(task.clone()))
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             // update which subtasks belong to this task
             diesel::delete(
                 schema::subtasks_in_tasks::table
                     .filter(schema::subtasks_in_tasks::task_id.eq(task.id.clone())),
             )
-            .execute(&*conn)?;
+            .execute(&conn)?;
 
             let mut pos = -1;
             let task_id = task.id.clone();
@@ -336,7 +336,7 @@ impl Database {
             for subtask in subtasks_in_task {
                 diesel::insert_into(schema::subtasks_in_tasks::table)
                     .values(subtask)
-                    .execute(&*conn)?;
+                    .execute(&conn)?;
             }
             self.delete_stale_subtasks(user)?;
             Ok(())
@@ -352,10 +352,10 @@ impl Database {
                     .filter(schema::access::object_id.eq(task_id.to_string()))
                     .filter(schema::access::user_id.eq(user.to_string())),
             )
-            .execute(&*conn)?;
+            .execute(&conn)?;
 
             // delete task
-            diesel::delete(schema::tasks::table.find(task_id.to_string())).execute(&*conn)?;
+            diesel::delete(schema::tasks::table.find(task_id.to_string())).execute(&conn)?;
 
             // delete stale subtasks
             self.delete_stale_subtasks(user)?;
@@ -399,7 +399,7 @@ impl Database {
                 schema::worksheets::columns::is_online,
                 schema::worksheets::columns::is_solution_online,
             ))
-            .load::<models::QueryableWorksheet>(&*conn)?;
+            .load::<models::QueryableWorksheet>(&conn)?;
         let mut worksheets = Vec::new();
         for worksheet in queryable_worksheets {
             worksheets.push(self.queryable_worksheet_to_worksheet(worksheet)?);
@@ -416,7 +416,7 @@ impl Database {
             .filter(schema::tasks_in_worksheets::columns::worksheet_id.eq(&queryable_worksheet.id))
             .select(schema::tasks_in_worksheets::columns::task_id)
             .order(schema::tasks_in_worksheets::position)
-            .load::<String>(&*conn)?;
+            .load::<String>(&conn)?;
         Ok(models::Worksheet {
             id: queryable_worksheet.id,
             name: queryable_worksheet.name,
@@ -448,7 +448,7 @@ impl Database {
                     user_id: user.to_string(),
                     object_id: worksheet_id.to_string(),
                 })
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             // set tasks belonging to worksheet
             for (position, task_id) in worksheet.tasks.iter().enumerate() {
@@ -458,13 +458,13 @@ impl Database {
                         worksheet_id: worksheet_id.to_string(),
                         position: position as i32,
                     })
-                    .execute(&*conn)?;
+                    .execute(&conn)?;
             }
 
             // insert worksheet object
             diesel::insert_into(schema::worksheets::table)
                 .values(new_worksheet)
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             Ok(worksheet_id)
         })?)
@@ -475,7 +475,7 @@ impl Database {
         Ok(self.queryable_worksheet_to_worksheet(
             schema::worksheets::table
                 .find(worksheet_id.to_string())
-                .get_result::<models::QueryableWorksheet>(&*conn)?,
+                .get_result::<models::QueryableWorksheet>(&conn)?,
         )?)
     }
 
@@ -494,14 +494,14 @@ impl Database {
                 .set(models::QueryableWorksheet::from_worksheet(
                     worksheet.clone(),
                 ))
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             // update which tasks belong to worksheet
             diesel::delete(
                 schema::tasks_in_worksheets::table
                     .filter(schema::tasks_in_worksheets::worksheet_id.eq(worksheet.id.clone())),
             )
-            .execute(&*conn)?;
+            .execute(&conn)?;
             let mut pos = -1;
             let worksheet_id = worksheet.id.clone();
             let tasks_in_worksheet: Vec<models::TasksInWorksheet> = worksheet
@@ -520,7 +520,7 @@ impl Database {
             for task in tasks_in_worksheet {
                 diesel::insert_into(schema::tasks_in_worksheets::table)
                     .values(task)
-                    .execute(&*conn)?;
+                    .execute(&conn)?;
             }
 
             self.delete_stale_tasks(user)?;
@@ -538,11 +538,11 @@ impl Database {
                     .filter(schema::access::object_id.eq(worksheet_id.to_string()))
                     .filter(schema::access::user_id.eq(user.to_string())),
             )
-            .execute(&*conn)?;
+            .execute(&conn)?;
 
             // delete worksheet
             diesel::delete(schema::worksheets::table.find(worksheet_id.to_string()))
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             // delete stale tasks
             self.delete_stale_tasks(user)?;
@@ -578,14 +578,14 @@ impl Database {
         let conn = self.pool.get()?;
         Ok(schema::users::table
             .filter(schema::users::name.eq(name))
-            .get_result::<models::User>(&*conn)?)
+            .get_result::<models::User>(&conn)?)
     }
 
     pub fn get_user_by_id(&self, user_id: Uuid) -> Result<models::User, DatabaseError> {
         let conn = self.pool.get()?;
         Ok(schema::users::table
             .find(user_id.to_string())
-            .get_result::<models::User>(&*conn)?)
+            .get_result::<models::User>(&conn)?)
     }
 
     pub fn update_account(
@@ -600,7 +600,7 @@ impl Database {
                 login.password,
                 Some(user_id),
             ))
-            .execute(&*conn)?;
+            .execute(&conn)?;
         Ok(())
     }
 
@@ -608,7 +608,7 @@ impl Database {
         let conn = self.pool.get()?;
         diesel::insert_into(schema::users::table)
             .values(models::User::new(login.username, login.password, None))
-            .execute(&*conn)?;
+            .execute(&conn)?;
         Ok(())
     }
 
@@ -634,7 +634,7 @@ impl Database {
             for i in 0..20 {
                 match diesel::insert_into(schema::aliases::table)
                     .values(alias.clone())
-                    .execute(&*conn)
+                    .execute(&conn)
                 {
                     Ok(_) => return Ok(alias.alias),
                     Err(e) => match e {
@@ -662,14 +662,14 @@ impl Database {
         let conn = self.pool.get()?;
         Ok(schema::aliases::table
             .filter(schema::aliases::object_id.eq(id.to_string()))
-            .get_result::<models::Alias>(&*conn)?)
+            .get_result::<models::Alias>(&conn)?)
     }
 
     pub fn get_uuid_by_alias(&self, alias: String) -> Result<models::Alias, DatabaseError> {
         let conn = self.pool.get()?;
         Ok(schema::aliases::table
             .filter(schema::aliases::alias.eq(alias))
-            .get_result::<models::Alias>(&*conn)?)
+            .get_result::<models::Alias>(&conn)?)
     }
 
     pub fn get_courses(&self, user: Uuid) -> Result<Vec<models::Course>, DatabaseError> {
@@ -702,7 +702,7 @@ impl Database {
             .filter(schema::worksheets_in_courses::columns::course_id.eq(&queryable_course.id))
             .select(schema::worksheets_in_courses::columns::worksheet_id)
             .order(schema::worksheets_in_courses::position)
-            .load::<String>(&*conn)?;
+            .load::<String>(&conn)?;
         Ok(models::Course {
             id: queryable_course.id,
             name: queryable_course.name,
@@ -728,12 +728,12 @@ impl Database {
                     user_id: user.to_string(),
                     object_id: course_id.to_string(),
                 })
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             // insert course object
             diesel::insert_into(schema::courses::table)
                 .values(new_course)
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             // set worksheets belonging to course
             for (position, worksheet) in course.worksheets.iter().enumerate() {
@@ -743,7 +743,7 @@ impl Database {
                         course_id: course_id.to_string(),
                         position: position as i32,
                     })
-                    .execute(&*conn)?;
+                    .execute(&conn)?;
             }
 
             Ok(course_id)
@@ -755,7 +755,7 @@ impl Database {
         Ok(self.queryable_course_to_course(
             schema::courses::table
                 .find(course_id.to_string())
-                .get_result::<models::QueryableCourse>(&*conn)?,
+                .get_result::<models::QueryableCourse>(&conn)?,
         )?)
     }
 
@@ -775,7 +775,7 @@ impl Database {
                 schema::courses::table.filter(schema::courses::id.eq(course_id.to_string())),
             )
             .set(models::QueryableCourse::from_course(course.clone()))
-            .execute(&*conn)?;
+            .execute(&conn)?;
 
             // update which worksheets belong to course
             // first delete old ones
@@ -783,7 +783,7 @@ impl Database {
                 schema::worksheets_in_courses::table
                     .filter(schema::worksheets_in_courses::course_id.eq(course.id.clone())),
             )
-            .execute(&*conn)?;
+            .execute(&conn)?;
 
             // then list new ones
             let mut pos = -1;
@@ -805,7 +805,7 @@ impl Database {
             for sheet in worksheets_in_course {
                 diesel::insert_into(schema::worksheets_in_courses::table)
                     .values(sheet)
-                    .execute(&*conn)?;
+                    .execute(&conn)?;
             }
             self.delete_stale_worksheets(user)?;
             Ok(())
@@ -818,15 +818,15 @@ impl Database {
             diesel::delete(
                 schema::access::table.filter(schema::access::object_id.eq(course_id.to_string())),
             )
-            .execute(&*conn)?;
+            .execute(&conn)?;
 
             diesel::delete(
                 schema::worksheets_in_courses::table
                     .filter(schema::worksheets_in_courses::course_id.eq(course_id.to_string())),
             )
-            .execute(&*conn)?;
+            .execute(&conn)?;
 
-            diesel::delete(schema::courses::table.find(course_id.to_string())).execute(&*conn)?;
+            diesel::delete(schema::courses::table.find(course_id.to_string())).execute(&conn)?;
             self.delete_stale_worksheets(user)?;
             Ok(())
         })?;
@@ -846,7 +846,7 @@ impl Database {
                 schema::databases::columns::name,
                 schema::databases::columns::content,
             ))
-            .load::<models::Database>(&*conn)?)
+            .load::<models::Database>(&conn)?)
     }
 
     pub fn create_database(
@@ -866,12 +866,12 @@ impl Database {
                     user_id: user.to_string(),
                     object_id: id.to_string(),
                 })
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             // insert database object
             diesel::insert_into(schema::databases::table)
                 .values(database)
-                .execute(&*conn)?;
+                .execute(&conn)?;
 
             Ok(id)
         })?)
@@ -881,7 +881,7 @@ impl Database {
         let conn = self.pool.get()?;
         Ok(schema::databases::table
             .find(database_id.to_string())
-            .get_result::<models::Database>(&*conn)?)
+            .get_result::<models::Database>(&conn)?)
     }
 
     pub fn update_database(
@@ -893,13 +893,13 @@ impl Database {
         database.id = database_id.to_string();
         diesel::update(schema::databases::table.find(database_id.to_string()))
             .set(database)
-            .execute(&*conn)?;
+            .execute(&conn)?;
         Ok(())
     }
 
     pub fn delete_database(&self, database_id: Uuid) -> Result<(), DatabaseError> {
         let conn = self.pool.get()?;
-        diesel::delete(schema::databases::table.find(database_id.to_string())).execute(&*conn)?;
+        diesel::delete(schema::databases::table.find(database_id.to_string())).execute(&conn)?;
         Ok(())
     }
 

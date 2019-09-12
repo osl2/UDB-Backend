@@ -51,9 +51,9 @@ where
             .extensions()
             .get::<actix_web_jwt_middleware::AuthenticationData>())
         {
-            Some(auth_data) => Some(uuid::Uuid::parse_str(
-                &&(*auth_data).clone().claims.sub.clone().unwrap(),
-            ).unwrap()),
+            Some(auth_data) => Some(
+                uuid::Uuid::parse_str(&&(*auth_data).clone().claims.sub.clone().unwrap()).unwrap(),
+            ),
             None => None,
         };
 
