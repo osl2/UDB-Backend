@@ -1,9 +1,9 @@
 use upowdb_models::models;
 use base64::encode;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let origin = "https://staging.upowdb.xyz";
-    let basepath = "http://10.214.227.119:8082/api/v1";
+    let basepath = "http://localhost:8082/api/v1";
     let username = "elite_admin";
     let password = "2342";
 
