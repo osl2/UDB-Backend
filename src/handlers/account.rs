@@ -149,7 +149,7 @@ fn create_account(
     }
 }
 fn delete_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let user = req.extensions().get::<Uuid>().unwrap().clone();
+    let user = *req.extensions().get::<Uuid>().unwrap();
     match database(&req).delete_account(user) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(error) => Box::new(
@@ -183,7 +183,7 @@ fn clean_up_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Err
     match database(&req).delete_stale_objects(user(&req)) {
         Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
         Err(e) => {
-            log::error!("Couldn't delete task: {:?}", e);
+            log::error!("Couldn't clean up stale objects: {:?}", e);
             Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
         }
     }

@@ -12,5 +12,5 @@ pub fn database(req: &actix_web::HttpRequest) -> crate::database::Database {
 }
 
 pub fn user(req: &actix_web::HttpRequest) -> uuid::Uuid {
-    req.extensions().get::<uuid::Uuid>().unwrap().clone()
+    *req.extensions().get::<uuid::Uuid>().unwrap()
 }
