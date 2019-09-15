@@ -137,7 +137,7 @@ fn main() {
                     .max_age(3600)
             })
             .wrap(Cors::default())
-            .wrap(actix_web::middleware::Logger::default())
+            .wrap(actix_web::middleware::Logger::new("\"%r\" %s %b \"%{User-Agent}i\" %T"))
             .wrap(actix_web_prom::PrometheusMetrics::new("api", "/metrics"))
             .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
             .service(
