@@ -32,7 +32,7 @@ impl AppData {
 #[actix_web::main]
 async fn main() {
     let cli_matches = cli::setup_cli();
-    logging::setup_logging(match cli_matches.occurrences_of("v") {
+    logging::setup_logging(match cli_matches.get_count("v") {
         0 => log::LevelFilter::Error,
         1 => log::LevelFilter::Warn,
         2 => log::LevelFilter::Info,
@@ -40,7 +40,7 @@ async fn main() {
         _ => log::LevelFilter::Trace,
     });
     let configuration =
-        settings::Settings::new(cli_matches.value_of("config").unwrap_or("config.toml")).unwrap();
+        settings::Settings::new(cli_matches.get_one::<String>("config").map(|s| s.as_str()).unwrap_or("config.toml")).unwrap();
 
     let appstate = AppData::from_configuration(configuration.clone());
 
