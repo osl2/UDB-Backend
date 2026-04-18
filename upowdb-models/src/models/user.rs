@@ -1,6 +1,5 @@
 use crate::schema::users;
-use argon2rs;
-use base64;
+use base64::{Engine as _, engine::general_purpose};
 use diesel::{Insertable, Queryable};
 use rand::random;
 use serde::{Deserialize, Serialize};
@@ -22,7 +21,7 @@ impl User {
             Some(id) => id.to_hyphenated().to_string(),
             None => Uuid::new_v4().to_hyphenated().to_string(),
         };
-        let password_hash = base64::encode(&argon2rs::argon2d_simple(&password, &salt));
+        let password_hash = general_purpose::STANDARD.encode(argon2rs::argon2d_simple(&password, &salt));
         User {
             id,
             name,
@@ -31,7 +30,7 @@ impl User {
         }
     }
     pub fn verify_password(&self, password: String) -> bool {
-        self.password_hash == base64::encode(&argon2rs::argon2d_simple(&password, &self.salt))
+        self.password_hash == general_purpose::STANDARD.encode(argon2rs::argon2d_simple(&password, &self.salt))
     }
     pub fn returnable_userdata(&self) -> serde_json::Value {
         let mut map = serde_json::map::Map::new();

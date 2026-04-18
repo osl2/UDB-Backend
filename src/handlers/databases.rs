@@ -1,8 +1,7 @@
 use crate::models;
 use crate::schema;
-use actix_web::{web, Error, FromRequest, HttpRequest, HttpResponse, Scope};
-
-use futures::future::{Future, IntoFuture};
+use actix_web::{web, HttpRequest, HttpResponse, Responder, Scope};
+use actix_web::HttpMessage;
 use uuid::Uuid;
 
 use diesel::{
@@ -11,26 +10,23 @@ use diesel::{
 };
 
 pub fn get_scope() -> Scope {
-    let json_config = web::Json::<models::Database>::configure(|cfg| {
-        cfg.limit(4194304) //4MB limit
-    });
     web::scope("/databases")
         .service(
             web::resource("")
-                .data(json_config.clone())
-                .route(web::get().to_async(get_databases))
-                .route(web::post().to_async(create_database)),
+                .app_data(web::JsonConfig::default().limit(4194304))
+                .route(web::get().to(get_databases))
+                .route(web::post().to(create_database)),
         )
         .service(
             web::resource("/{id}")
-                .data(json_config.clone())
-                .route(web::get().to_async(get_database))
-                .route(web::put().to_async(update_database))
-                .route(web::delete().to_async(delete_database)),
+                .app_data(web::JsonConfig::default().limit(4194304))
+                .route(web::get().to(get_database))
+                .route(web::put().to(update_database))
+                .route(web::delete().to(delete_database)),
         )
 }
 
-pub fn get_databases(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+pub async fn get_databases(req: HttpRequest) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
@@ -56,18 +52,18 @@ pub fn get_databases(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Er
         ))
         .load::<models::Database>(&*conn)
     {
-        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
+        Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
             log::error!("Couldn't load database: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-pub fn create_database(
+pub async fn create_database(
     req: HttpRequest,
     json: web::Json<models::Database>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
@@ -81,12 +77,10 @@ pub fn create_database(
         .unwrap();
 
     match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
-        // create database object
         let mut new_database = json.into_inner();
         let id = Uuid::new_v4();
         new_database.id = id.to_string();
 
-        // insert access for user
         diesel::insert_into(schema::access::table)
             .values(models::Access {
                 user_id: sub,
@@ -94,85 +88,85 @@ pub fn create_database(
             })
             .execute(&*conn)?;
 
-        // insert database object
         diesel::insert_into(schema::databases::table)
             .values(new_database)
             .execute(&*conn)?;
 
         Ok(id)
     }) {
-        Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
+        Ok(id) => HttpResponse::Ok().body(id.to_string()),
         Err(e) => {
             log::error!("Couldn't create database: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-pub fn get_database(
+pub async fn get_database(
     req: HttpRequest,
     id: web::Path<Uuid>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
         .unwrap();
+    let uuid = id.into_inner();
 
     match schema::databases::table
-        .find(format!("{}", id))
+        .find(format!("{}", uuid))
         .get_result::<models::Database>(&*conn)
     {
-        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
+        Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => match e {
-            diesel::result::Error::NotFound => {
-                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
-            }
+            diesel::result::Error::NotFound => HttpResponse::NotFound().finish(),
             e => {
                 log::error!("Couldn't load database: {}", e);
-                Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+                HttpResponse::InternalServerError().finish()
             }
         },
     }
 }
 
-pub fn update_database(
+pub async fn update_database(
     req: HttpRequest,
     id: web::Path<Uuid>,
     json: web::Json<models::Database>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
         .unwrap();
+    let uuid = id.into_inner();
 
-    match diesel::update(schema::databases::table.find(format!("{}", id)))
+    match diesel::update(schema::databases::table.find(format!("{}", uuid)))
         .set(json.into_inner())
         .execute(&*conn)
     {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             log::error!("Couldn't update database: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-pub fn delete_database(
+pub async fn delete_database(
     req: HttpRequest,
     id: web::Path<Uuid>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
         .unwrap();
+    let uuid = id.into_inner();
 
-    match diesel::delete(schema::databases::table.find(format!("{}", id.into_inner())))
+    match diesel::delete(schema::databases::table.find(format!("{}", uuid)))
         .execute(&*conn)
     {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             log::error!("Couldn't delete database: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }

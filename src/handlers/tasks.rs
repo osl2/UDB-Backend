@@ -1,30 +1,30 @@
 use crate::models;
 use crate::schema;
-use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
-
-use futures::future::{Future, IntoFuture};
+use actix_web::{web, HttpRequest, HttpResponse, Responder, Scope};
+use actix_web::HttpMessage;
 use uuid::Uuid;
 
 use diesel::{
     r2d2::{self, ConnectionManager},
     Connection, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl, SqliteConnection,
 };
+
 pub fn get_scope() -> Scope {
     web::scope("/tasks")
         .service(
             web::resource("")
-                .route(web::get().to_async(get_tasks))
-                .route(web::post().to_async(create_task)),
+                .route(web::get().to(get_tasks))
+                .route(web::post().to(create_task)),
         )
         .service(
             web::resource("/{id}")
-                .route(web::get().to_async(get_task))
-                .route(web::put().to_async(update_task))
-                .route(web::delete().to_async(delete_task)),
+                .route(web::get().to(get_task))
+                .route(web::put().to(update_task))
+                .route(web::delete().to(delete_task)),
         )
 }
 
-fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+async fn get_tasks(req: HttpRequest) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
@@ -63,19 +63,19 @@ fn get_tasks(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Er
                     subtasks: subtasks_query.unwrap(),
                 });
             }
-            Box::new(Ok(HttpResponse::Ok().json(tasks)).into_future())
+            HttpResponse::Ok().json(tasks)
         }
         Err(e) => {
             log::error!("Couldn't get tasks: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-fn create_task(
+async fn create_task(
     req: HttpRequest,
     json: web::Json<models::Task>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
@@ -89,7 +89,6 @@ fn create_task(
         .unwrap();
 
     match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
-        // create task object
         let task = json.into_inner();
         let task_id = Uuid::new_v4();
         let new_task = models::QueryableTask {
@@ -97,7 +96,6 @@ fn create_task(
             database_id: task.database_id,
         };
 
-        // insert access for user
         diesel::insert_into(schema::access::table)
             .values(models::Access {
                 user_id: sub,
@@ -105,7 +103,6 @@ fn create_task(
             })
             .execute(&*conn)?;
 
-        // set subtasks belonging to task
         for (position, subtask_id) in task.subtasks.iter().enumerate() {
             diesel::insert_into(schema::subtasks_in_tasks::table)
                 .values(models::SubtasksInTask {
@@ -116,81 +113,75 @@ fn create_task(
                 .execute(&*conn)?;
         }
 
-        // insert task object
         diesel::insert_into(schema::tasks::table)
             .values(new_task)
             .execute(&*conn)?;
 
         Ok(task_id)
     }) {
-        Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
+        Ok(id) => HttpResponse::Ok().body(id.to_string()),
         Err(e) => {
             log::error!("Couldn't create task: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-fn get_task(
+async fn get_task(
     req: HttpRequest,
     id: web::Path<Uuid>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
         .unwrap();
+    let uuid = id.into_inner();
 
     match schema::tasks::table
-        .find(format!("{}", id))
+        .find(format!("{}", uuid))
         .get_result::<models::QueryableTask>(&*conn)
     {
         Ok(task) => {
             let subtasks_query = schema::subtasks_in_tasks::table
-                .filter(schema::subtasks_in_tasks::columns::task_id.eq(format!("{}", id)))
+                .filter(schema::subtasks_in_tasks::columns::task_id.eq(format!("{}", uuid)))
                 .select(schema::subtasks_in_tasks::columns::subtask_id)
                 .order(schema::subtasks_in_tasks::position)
                 .load::<String>(&*conn);
 
-            Box::new(
-                Ok(HttpResponse::Ok().json(models::Task {
-                    id: task.id,
-                    database_id: task.database_id,
-                    subtasks: subtasks_query.unwrap(),
-                }))
-                .into_future(),
-            )
+            HttpResponse::Ok().json(models::Task {
+                id: task.id,
+                database_id: task.database_id,
+                subtasks: subtasks_query.unwrap(),
+            })
         }
         Err(e) => match e {
-            diesel::result::Error::NotFound => {
-                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
-            }
+            diesel::result::Error::NotFound => HttpResponse::NotFound().finish(),
             e => {
                 log::error!("Couldn't load task: {}", e);
-                Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+                HttpResponse::InternalServerError().finish()
             }
         },
     }
 }
 
-fn update_task(
+async fn update_task(
     req: HttpRequest,
     id: web::Path<Uuid>,
     json: web::Json<models::Task>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
         .unwrap();
+    let uuid = id.into_inner();
 
     match conn.transaction::<(), diesel::result::Error, _>(|| {
         let task = json.into_inner();
 
-        // update tasks
-        diesel::update(schema::tasks::table.find(format!("{}", id)))
+        diesel::update(schema::tasks::table.find(format!("{}", uuid)))
             .set(models::QueryableTask::from_task(task.clone()))
             .execute(&*conn)?;
 
-        // update which subtasks belong to this task
         diesel::delete(
             schema::subtasks_in_tasks::table
                 .filter(schema::subtasks_in_tasks::task_id.eq(task.id.clone())),
@@ -217,23 +208,22 @@ fn update_task(
         }
         Ok(())
     }) {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             log::error!("Couldn't update task: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-fn delete_task(
+async fn delete_task(
     req: HttpRequest,
     id: web::Path<Uuid>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
         .unwrap();
-
     let uuid = id.into_inner();
 
     match conn.transaction::<(), diesel::result::Error, _>(|| {
@@ -254,10 +244,10 @@ fn delete_task(
         diesel::delete(schema::tasks::table.find(format!("{}", uuid))).execute(&*conn)?;
         Ok(())
     }) {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             log::error!("Couldn't delete task: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }

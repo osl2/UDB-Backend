@@ -1,65 +1,64 @@
 use crate::{models, schema};
-use actix_web::{dev::ServiceRequest, web, Error, HttpMessage, HttpRequest, HttpResponse, Scope};
+use actix_web::{dev::ServiceRequest, web, Error, HttpMessage, HttpRequest, HttpResponse, Responder, Scope};
 use actix_web_httpauth::{extractors::basic::BasicAuth, middleware::HttpAuthentication};
 use diesel::{
     r2d2::{self, ConnectionManager},
     Connection, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection,
 };
-use futures::future::{self, Future, FutureResult, IntoFuture};
+use jsonwebtoken::{encode, EncodingKey, Header, Algorithm};
 use serde_json::json;
 use uuid::Uuid;
 
 pub fn get_scope() -> Scope {
-    let validator =
-        |req: ServiceRequest, credentials: BasicAuth| -> FutureResult<ServiceRequest, Error> {
-            let result: Result<Uuid, _> = (|| {
-                let extensions = req.extensions();
-                let conn = extensions
-                    .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
-                    .unwrap();
-                let user = schema::users::table
-                    .filter(schema::users::name.eq(credentials.user_id()))
-                    .get_result::<models::User>(&*conn)?;
-                let password = credentials
-                    .password()
-                    .ok_or(BasicAuthError::WrongPwError)
-                    .map(|pw| pw.clone().into_owned())?;
-                if user.verify_password(password) {
-                    Ok(Uuid::parse_str(&user.get_raw_id())?)
-                } else {
-                    Err(BasicAuthError::WrongPwError)
-                }
-            })();
-            match result {
-                Ok(user_id) => {
-                    req.extensions_mut().insert(user_id);
-                    future::ok(req)
-                }
-                Err(e) => {
-                    match e {
-                        BasicAuthError::WrongPwError | BasicAuthError::UserLoadingError(_) => {}
-                        BasicAuthError::InvalidUserID => {
-                            log::error!("Invalid user id in database, here's request: {:?}", req)
-                        }
-                    };
-                    future::err(actix_web::Error::from(()))
-                }
+    let validator = |req: ServiceRequest, credentials: BasicAuth| async move {
+        let result: Result<Uuid, BasicAuthError> = (|| {
+            let extensions = req.extensions();
+            let conn = extensions
+                .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+                .unwrap();
+            let user = schema::users::table
+                .filter(schema::users::name.eq(credentials.user_id()))
+                .get_result::<models::User>(&*conn)?;
+            let password = credentials
+                .password()
+                .ok_or(BasicAuthError::WrongPwError)
+                .map(|pw| pw.to_string())?;
+            if user.verify_password(password) {
+                Ok(Uuid::parse_str(&user.get_raw_id())?)
+            } else {
+                Err(BasicAuthError::WrongPwError)
             }
-        };
+        })();
+        match result {
+            Ok(user_id) => {
+                req.extensions_mut().insert(user_id);
+                Ok(req)
+            }
+            Err(e) => {
+                match e {
+                    BasicAuthError::WrongPwError | BasicAuthError::UserLoadingError(_) => {}
+                    BasicAuthError::InvalidUserID => {
+                        log::error!("Invalid user id in database, here's request: {:?}", req)
+                    }
+                };
+                Err((actix_web::Error::from(actix_web::error::ErrorUnauthorized("unauthorized")), req))
+            }
+        }
+    };
     let auth = HttpAuthentication::basic(validator);
     web::scope("/account")
         .service(
             web::resource("")
                 .wrap(auth.clone())
-                .route(web::get().to_async(get_account))
-                .route(web::put().to_async(update_account))
-                .route(web::delete().to_async(delete_account)),
+                .route(web::get().to(get_account))
+                .route(web::put().to(update_account))
+                .route(web::delete().to(delete_account)),
         )
-        .service(web::resource("/register").route(web::post().to_async(create_account)))
+        .service(web::resource("/register").route(web::post().to(create_account)))
         .service(
             web::resource("/login")
                 .wrap(auth)
-                .route(web::post().to_async(login)),
+                .route(web::post().to(login)),
         )
 }
 
@@ -75,13 +74,13 @@ impl From<diesel::result::Error> for BasicAuthError {
     }
 }
 
-impl From<uuid::parser::ParseError> for BasicAuthError {
-    fn from(_: uuid::parser::ParseError) -> BasicAuthError {
+impl From<uuid::Error> for BasicAuthError {
+    fn from(_: uuid::Error) -> BasicAuthError {
         BasicAuthError::InvalidUserID
     }
 }
 
-fn get_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+async fn get_account(req: HttpRequest) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
@@ -92,21 +91,18 @@ fn get_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
         .find(format!("{}", user))
         .get_result::<models::User>(&*conn)
     {
-        Ok(result) => {
-            Box::new(Ok(HttpResponse::Ok().json(result.returnable_userdata())).into_future())
-        }
+        Ok(result) => HttpResponse::Ok().json(result.returnable_userdata()),
         Err(e) => match e {
-            diesel::result::Error::NotFound => {
-                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
-            }
-            _ => Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future()),
+            diesel::result::Error::NotFound => HttpResponse::NotFound().finish(),
+            _ => HttpResponse::InternalServerError().finish(),
         },
     }
 }
-fn update_account(
+
+async fn update_account(
     req: HttpRequest,
     json: web::Json<models::Account>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
@@ -123,16 +119,15 @@ fn update_account(
             .execute(&*conn)?;
         Ok(())
     }) {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
-        Err(_) => {
-            Box::new(Ok(HttpResponse::BadRequest().body("Username already taken")).into_future())
-        }
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(_) => HttpResponse::BadRequest().body("Username already taken"),
     }
 }
-fn create_account(
+
+async fn create_account(
     req: HttpRequest,
     json: web::Json<models::Account>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
@@ -148,30 +143,26 @@ fn create_account(
             .execute(&*conn)?;
         Ok(())
     }) {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
-        Err(_) => {
-            Box::new(Ok(HttpResponse::BadRequest().body("Username already taken")).into_future())
-        }
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(_) => HttpResponse::BadRequest().body("Username already taken"),
     }
 }
-fn delete_account(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    Box::new(Ok(HttpResponse::NotImplemented().body(format!("{:?}", req))).into_future())
+
+async fn delete_account(req: HttpRequest) -> impl Responder {
+    HttpResponse::NotImplemented().body(format!("{:?}", req))
 }
-fn login(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let appdata: &crate::AppData = req.app_data().unwrap();
+
+async fn login(req: HttpRequest, data: web::Data<crate::AppData>) -> impl Responder {
     let extensions = req.extensions();
     let user = extensions.get::<Uuid>().unwrap();
 
-    match frank_jwt::encode(
-        json!({}),
-        &appdata.settings.jwt_key,
-        &json!({ "sub": user }),
-        frank_jwt::Algorithm::HS512,
-    ) {
-        Ok(token) => Box::new(Ok(HttpResponse::Ok().json(json!({ "token": token }))).into_future()),
+    let header = Header::new(Algorithm::HS512);
+    let claims = json!({ "sub": user });
+    match encode(&header, &claims, &EncodingKey::from_secret(data.settings.jwt_key.as_bytes())) {
+        Ok(token) => HttpResponse::Ok().json(json!({ "token": token })),
         Err(e) => {
             log::error!("Couldn't encode JWT: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }

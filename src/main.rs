@@ -1,6 +1,7 @@
 #![warn(unused_extern_crates)]
 use actix_cors::Cors;
 use actix_web::{http::Method, web, App, HttpServer};
+use actix_web_prom::PrometheusMetricsBuilder;
 use log::error;
 use regex::Regex;
 
@@ -18,8 +19,8 @@ mod settings;
 mod solution_compare;
 
 #[derive(Clone)]
-struct AppData {
-    settings: settings::Settings,
+pub struct AppData {
+    pub settings: settings::Settings,
 }
 
 impl AppData {
@@ -28,7 +29,8 @@ impl AppData {
     }
 }
 
-fn main() {
+#[actix_web::main]
+async fn main() {
     let cli_matches = cli::setup_cli();
     logging::setup_logging(match cli_matches.occurrences_of("v") {
         0 => log::LevelFilter::Error,
@@ -39,14 +41,31 @@ fn main() {
     });
     let configuration =
         settings::Settings::new(cli_matches.value_of("config").unwrap_or("config.toml")).unwrap();
-    let sys = actix::System::new("udb-backend");
 
     let appstate = AppData::from_configuration(configuration.clone());
 
     let jwt_key = configuration.jwt_key.clone();
+
+    let prometheus = PrometheusMetricsBuilder::new("api")
+        .endpoint("/metrics")
+        .build()
+        .unwrap();
+
     let mut server = HttpServer::new(move || {
+        let cors = {
+            let cors = Cors::default();
+            let cors = if let Some(host) = appstate.clone().settings.allowed_frontend.as_deref() {
+                cors.allowed_origin(host)
+            } else {
+                cors
+            };
+            cors.allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+                .supports_credentials()
+                .max_age(3600)
+        };
+
         App::new()
-            .data(appstate.clone())
+            .app_data(web::Data::new(appstate.clone()))
             .wrap(middlewares::upload_filter::UploadFilter { filter: false })
             .wrap(middlewares::ownership::OwnershipChecker{})
             .wrap(JwtAuthentication {
@@ -83,22 +102,10 @@ fn main() {
             .wrap(middlewares::db_connection::DatabaseConnection {
                 pool: appstate.clone().settings.db_connection.create_sqlite_connection_pool(),
             })
-            .wrap({
-                let cors = Cors::new();
-                let cors = if let Some(host) = appstate.clone().settings.allowed_frontend {
-                    cors.allowed_origin(&host)
-                } else {
-                    cors
-                };
-                cors
-                    .allowed_methods(&[Method::GET, Method::POST, Method::PUT, Method::DELETE])
-                    .supports_credentials()
-                    .max_age(3600)
-            })
-            .wrap(Cors::default())
+            .wrap(cors)
             .wrap(actix_web::middleware::Logger::default())
-            .wrap(actix_web_prom::PrometheusMetrics::new("api", "/metrics"))
-            .service(web::resource("/health").to(|| actix_web::HttpResponse::Ok().finish()))
+            .wrap(prometheus.clone())
+            .service(web::resource("/health").to(|| async { actix_web::HttpResponse::Ok().finish() }))
             .service(
                 web::scope("/api/v1")
                     .service(handlers::account::get_scope())
@@ -119,9 +126,7 @@ fn main() {
             }
         };
     }
-    server.start();
-
-    match sys.run() {
+    match server.run().await {
         Ok(_) => (),
         Err(e) => error!("Something went wrong starting the runtime: {}", e),
     }

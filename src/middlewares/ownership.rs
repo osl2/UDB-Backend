@@ -1,65 +1,70 @@
 use crate::schema;
 use actix_web::{
-    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    body::EitherBody,
+    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage,
 };
 use diesel::{
     r2d2::{self, ConnectionManager},
     ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection,
 };
-use futures::{
-    future::{ok, Either, FutureResult},
-    Poll,
-};
+use futures_util::future::LocalBoxFuture;
 use regex::Regex;
+use std::{future::{ready, Ready}, rc::Rc};
 
 pub struct OwnershipChecker {}
 
-impl<S, B> Transform<S> for OwnershipChecker
+impl<S, B> Transform<S, ServiceRequest> for OwnershipChecker
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type InitError = ();
     type Transform = OwnershipCheckerMiddleware<S>;
-    type Future = FutureResult<Self::Transform, Self::InitError>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(OwnershipCheckerMiddleware { service })
+        ready(Ok(OwnershipCheckerMiddleware { service: Rc::new(service) }))
     }
 }
 
 pub struct OwnershipCheckerMiddleware<S> {
-    service: S,
+    service: Rc<S>,
 }
 
-impl<S, B> Service for OwnershipCheckerMiddleware<S>
+impl<S, B> Service<ServiceRequest> for OwnershipCheckerMiddleware<S>
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
-    type Future = futures::future::Either<S::Future, FutureResult<Self::Response, Self::Error>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.service.poll_ready()
-    }
+    forward_ready!(service);
 
-    fn call(&mut self, req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
         lazy_static::lazy_static! {
             static ref RE: Regex = Regex::new(r"(?P<uuid>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$").unwrap();
         }
+
         let id = match RE.captures(req.path()) {
-            Some(captures) => captures.get(1),
-            None => return Either::A(self.service.call(req)),
+            Some(captures) => match captures.get(1) {
+                Some(m) => Some(m.as_str().to_string()),
+                None => None,
+            },
+            None => {
+                let svc = self.service.clone();
+                return Box::pin(async move {
+                    svc.call(req).await.map(|res| res.map_into_left_body())
+                });
+            }
         };
+
         let result = {
             let extensions = req.extensions();
             let conn =
@@ -70,9 +75,8 @@ where
                 "PUT" | "DELETE" => {
                     match (conn, token, id) {
                         (Some(conn), Some(token), Some(id)) => {
-                            // Check whether the user has access to the object
                             schema::access::table
-                                .filter(schema::access::object_id.eq(id.as_str().to_string()))
+                                .filter(schema::access::object_id.eq(id))
                                 .filter(
                                     schema::access::user_id.eq(token.claims.sub.clone().unwrap()),
                                 )
@@ -95,11 +99,16 @@ where
             }
         };
 
+        let svc = self.service.clone();
         match result {
-            Ok(_) => Either::A(self.service.call(req)),
-            Err(_) => Either::B(ok(
-                req.into_response(actix_web::HttpResponse::Forbidden().finish().into_body())
-            )),
+            Ok(_) => Box::pin(async move {
+                svc.call(req).await.map(|res| res.map_into_left_body())
+            }),
+            Err(_) => Box::pin(async move {
+                Ok(req.into_response(
+                    actix_web::HttpResponse::Forbidden().finish(),
+                ).map_into_right_body())
+            }),
         }
     }
 }

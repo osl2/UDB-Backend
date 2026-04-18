@@ -1,27 +1,27 @@
 use crate::alias_generator::AliasGenerator;
 use crate::models;
 use crate::schema;
-use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
+use actix_web::{web, HttpRequest, HttpResponse, Responder, Scope};
+use actix_web::HttpMessage;
 use diesel::{
     r2d2::{self, ConnectionManager},
     sqlite::SqliteConnection,
     Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
 };
-use futures::future::{Future, IntoFuture};
 use lazy_static::lazy_static;
 use uuid::Uuid;
 
 pub fn get_scope() -> Scope {
     web::scope("/alias")
-        .service(web::resource("").route(web::post().to_async(create_alias)))
-        .service(web::resource("/{id}").route(web::get().to_async(get_alias)))
-        .service(web::resource("/uuid/{alias}").route(web::get().to_async(get_uuid)))
+        .service(web::resource("").route(web::post().to(create_alias)))
+        .service(web::resource("/{id}").route(web::get().to(get_alias)))
+        .service(web::resource("/uuid/{alias}").route(web::get().to(get_uuid)))
 }
 
-fn create_alias(
+async fn create_alias(
     req: HttpRequest,
     json: web::Json<models::AliasRequest>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
@@ -37,7 +37,6 @@ fn create_alias(
             object_id: alias_req.object_id,
             object_type: alias_req.object_type,
         };
-        // Try to find a free alias 20 times
         for i in 0..20 {
             match diesel::insert_into(schema::aliases::table)
                 .values(alias.clone())
@@ -53,8 +52,6 @@ fn create_alias(
                         diesel::result::DatabaseErrorKind::UniqueViolation,
                         _,
                     ) => {
-                        // Try to find a four word alias for five times, then five words for five times,
-                        // then six for five times and then seven for five times.
                         alias.alias = GENERATOR.generate(4 + i / 5);
                     }
                     e => return Err(AliasError::from(e)),
@@ -63,16 +60,15 @@ fn create_alias(
         }
         Err(AliasError::NoFreeAliases)
     }) {
-        Ok(alias) => Box::new(Ok(HttpResponse::Ok().body(alias)).into_future()),
+        Ok(alias) => HttpResponse::Ok().body(alias),
         Err(e) => match e {
             AliasError::Diesel(e) => {
                 log::error!("Couldn't create new alias: {}", e);
-                Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+                HttpResponse::InternalServerError().finish()
             }
-            AliasError::NoFreeAliases => Box::new(
-                Ok(HttpResponse::InternalServerError().body("Couldn't find a free alias."))
-                    .into_future(),
-            ),
+            AliasError::NoFreeAliases => {
+                HttpResponse::InternalServerError().body("Couldn't find a free alias.")
+            }
         },
     }
 }
@@ -88,44 +84,45 @@ impl From<diesel::result::Error> for AliasError {
     }
 }
 
-fn get_alias(
+async fn get_alias(
     req: HttpRequest,
     id: web::Path<Uuid>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
         .unwrap();
+    let uuid = id.into_inner();
 
     match schema::aliases::table
-        .filter(schema::aliases::object_id.eq(format!("{}", id)))
+        .filter(schema::aliases::object_id.eq(format!("{}", uuid)))
         .get_result::<models::Alias>(&*conn)
     {
-        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
+        Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
             log::error!("Couldn't get alias: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-fn get_uuid(
+async fn get_uuid(
     req: HttpRequest,
     alias: web::Path<String>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
     let conn = extensions
         .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
         .unwrap();
 
     match schema::aliases::table
-        .filter(schema::aliases::alias.eq(format!("{}", alias)))
+        .filter(schema::aliases::alias.eq(alias.into_inner()))
         .get_result::<models::Alias>(&*conn)
     {
-        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
+        Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
             log::error!("Couldn't get alias: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
