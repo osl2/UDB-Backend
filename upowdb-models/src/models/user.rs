@@ -18,8 +18,8 @@ impl User {
     pub fn new(name: String, password: String, id: Option<Uuid>) -> User {
         let salt: String = (0..32).map(|_| random::<char>()).collect();
         let id = match id {
-            Some(id) => id.to_hyphenated().to_string(),
-            None => Uuid::new_v4().to_hyphenated().to_string(),
+            Some(id) => id.to_string(),
+            None => Uuid::new_v4().to_string(),
         };
         let password_hash = general_purpose::STANDARD.encode(argon2rs::argon2d_simple(&password, &salt));
         User {

@@ -2,6 +2,7 @@ use crate::models;
 use crate::schema;
 use actix_web::{web, HttpRequest, HttpResponse, Responder, Scope};
 use actix_web::HttpMessage;
+use std::cell::RefCell;
 use uuid::Uuid;
 
 use diesel::{
@@ -28,9 +29,10 @@ pub fn get_scope() -> Scope {
 
 pub async fn get_databases(req: HttpRequest) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
         .unwrap()
@@ -50,7 +52,7 @@ pub async fn get_databases(req: HttpRequest) -> impl Responder {
             schema::databases::columns::name,
             schema::databases::columns::content,
         ))
-        .load::<models::Database>(&*conn)
+        .load::<models::Database>(&mut *conn)
     {
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
@@ -65,9 +67,10 @@ pub async fn create_database(
     json: web::Json<models::Database>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
         .unwrap()
@@ -76,7 +79,7 @@ pub async fn create_database(
         .clone()
         .unwrap();
 
-    match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
+    match conn.transaction::<Uuid, diesel::result::Error, _>(|conn| {
         let mut new_database = json.into_inner();
         let id = Uuid::new_v4();
         new_database.id = id.to_string();
@@ -86,11 +89,11 @@ pub async fn create_database(
                 user_id: sub,
                 object_id: id.to_string(),
             })
-            .execute(&*conn)?;
+            .execute(conn)?;
 
         diesel::insert_into(schema::databases::table)
             .values(new_database)
-            .execute(&*conn)?;
+            .execute(conn)?;
 
         Ok(id)
     }) {
@@ -107,14 +110,15 @@ pub async fn get_database(
     id: web::Path<Uuid>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let uuid = id.into_inner();
 
     match schema::databases::table
         .find(format!("{}", uuid))
-        .get_result::<models::Database>(&*conn)
+        .get_result::<models::Database>(&mut *conn)
     {
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => match e {
@@ -133,14 +137,15 @@ pub async fn update_database(
     json: web::Json<models::Database>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let uuid = id.into_inner();
 
     match diesel::update(schema::databases::table.find(format!("{}", uuid)))
         .set(json.into_inner())
-        .execute(&*conn)
+        .execute(&mut *conn)
     {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
@@ -155,13 +160,14 @@ pub async fn delete_database(
     id: web::Path<Uuid>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let uuid = id.into_inner();
 
     match diesel::delete(schema::databases::table.find(format!("{}", uuid)))
-        .execute(&*conn)
+        .execute(&mut *conn)
     {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {

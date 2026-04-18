@@ -10,7 +10,7 @@ use diesel::{
 };
 use futures_util::future::LocalBoxFuture;
 use regex::Regex;
-use std::{future::{ready, Ready}, rc::Rc};
+use std::{cell::RefCell, future::{ready, Ready}, rc::Rc};
 
 pub struct OwnershipChecker {}
 
@@ -67,20 +67,21 @@ where
 
         let result = {
             let extensions = req.extensions();
-            let conn =
-                extensions.get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>();
+            let conn_cell =
+                extensions.get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>();
             let token = extensions.get::<actix_web_jwt_middleware::AuthenticationData>();
 
             match req.method().as_str() {
                 "PUT" | "DELETE" => {
-                    match (conn, token, id) {
-                        (Some(conn), Some(token), Some(id)) => {
+                    match (conn_cell, token, id) {
+                        (Some(conn_cell), Some(token), Some(id)) => {
+                            let mut conn = conn_cell.borrow_mut();
                             schema::access::table
                                 .filter(schema::access::object_id.eq(id))
                                 .filter(
                                     schema::access::user_id.eq(token.claims.sub.clone().unwrap()),
                                 )
-                                .get_result::<(String, String)>(&*conn)
+                                .get_result::<(String, String)>(&mut *conn)
                                 .map_err(|e| match e {
                                     diesel::result::Error::NotFound => {
                                         OwnershipCheckerError::NoAccess

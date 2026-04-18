@@ -9,6 +9,7 @@ use diesel::{
     Connection, ExpressionMethods, QueryDsl, RunQueryDsl,
 };
 use lazy_static::lazy_static;
+use std::cell::RefCell;
 use uuid::Uuid;
 
 pub fn get_scope() -> Scope {
@@ -23,11 +24,12 @@ async fn create_alias(
     json: web::Json<models::AliasRequest>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
 
-    match conn.transaction::<String, AliasError, _>(|| {
+    match conn.transaction::<String, AliasError, _>(|conn| {
         let alias_req = json.into_inner();
         lazy_static! {
             static ref GENERATOR: AliasGenerator = AliasGenerator::default();
@@ -40,7 +42,7 @@ async fn create_alias(
         for i in 0..20 {
             match diesel::insert_into(schema::aliases::table)
                 .values(alias.clone())
-                .execute(&*conn)
+                .execute(conn)
             {
                 Ok(_) => return Ok(alias.alias),
                 Err(e) => match e {
@@ -89,14 +91,15 @@ async fn get_alias(
     id: web::Path<Uuid>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let uuid = id.into_inner();
 
     match schema::aliases::table
         .filter(schema::aliases::object_id.eq(format!("{}", uuid)))
-        .get_result::<models::Alias>(&*conn)
+        .get_result::<models::Alias>(&mut *conn)
     {
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
@@ -111,13 +114,14 @@ async fn get_uuid(
     alias: web::Path<String>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
 
     match schema::aliases::table
         .filter(schema::aliases::alias.eq(alias.into_inner()))
-        .get_result::<models::Alias>(&*conn)
+        .get_result::<models::Alias>(&mut *conn)
     {
         Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {

@@ -7,18 +7,20 @@ use diesel::{
 };
 use jsonwebtoken::{encode, EncodingKey, Header, Algorithm};
 use serde_json::json;
+use std::cell::RefCell;
 use uuid::Uuid;
 
 pub fn get_scope() -> Scope {
     let validator = |req: ServiceRequest, credentials: BasicAuth| async move {
         let result: Result<Uuid, BasicAuthError> = (|| {
             let extensions = req.extensions();
-            let conn = extensions
-                .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+            let conn_cell = extensions
+                .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
                 .unwrap();
+            let mut conn = conn_cell.borrow_mut();
             let user = schema::users::table
                 .filter(schema::users::name.eq(credentials.user_id()))
-                .get_result::<models::User>(&*conn)?;
+                .get_result::<models::User>(&mut *conn)?;
             let password = credentials
                 .password()
                 .ok_or(BasicAuthError::WrongPwError)
@@ -82,14 +84,15 @@ impl From<uuid::Error> for BasicAuthError {
 
 async fn get_account(req: HttpRequest) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let user = extensions.get::<Uuid>().unwrap();
 
     match schema::users::table
         .find(format!("{}", user))
-        .get_result::<models::User>(&*conn)
+        .get_result::<models::User>(&mut *conn)
     {
         Ok(result) => HttpResponse::Ok().json(result.returnable_userdata()),
         Err(e) => match e {
@@ -104,19 +107,20 @@ async fn update_account(
     json: web::Json<models::Account>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let user = extensions.get::<Uuid>().unwrap();
     let account_template = json.into_inner();
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
+    match conn.transaction::<(), diesel::result::Error, _>(|conn| {
         diesel::update(schema::users::table.find(format!("{}", user)))
             .set(models::User::new(
                 account_template.username,
                 account_template.password,
                 Some(*user),
             ))
-            .execute(&*conn)?;
+            .execute(conn)?;
         Ok(())
     }) {
         Ok(_) => HttpResponse::Ok().finish(),
@@ -129,18 +133,19 @@ async fn create_account(
     json: web::Json<models::Account>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let account_template = json.into_inner();
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
+    match conn.transaction::<(), diesel::result::Error, _>(|conn| {
         diesel::insert_into(schema::users::table)
             .values(models::User::new(
                 account_template.username,
                 account_template.password,
                 None,
             ))
-            .execute(&*conn)?;
+            .execute(conn)?;
         Ok(())
     }) {
         Ok(_) => HttpResponse::Ok().finish(),

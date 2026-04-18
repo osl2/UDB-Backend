@@ -2,6 +2,7 @@ use crate::models;
 use crate::schema;
 use actix_web::{web, HttpRequest, HttpResponse, Responder, Scope};
 use actix_web::HttpMessage;
+use std::cell::RefCell;
 use uuid::Uuid;
 
 use diesel::{
@@ -26,9 +27,10 @@ pub fn get_scope() -> Scope {
 
 async fn get_tasks(req: HttpRequest) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
         .unwrap()
@@ -47,7 +49,7 @@ async fn get_tasks(req: HttpRequest) -> impl Responder {
             schema::tasks::columns::id,
             schema::tasks::columns::database_id,
         ))
-        .load::<models::QueryableTask>(&*conn)
+        .load::<models::QueryableTask>(&mut *conn)
     {
         Ok(query_tasks) => {
             let mut tasks: Vec<models::Task> = Vec::new();
@@ -56,7 +58,7 @@ async fn get_tasks(req: HttpRequest) -> impl Responder {
                     .filter(schema::subtasks_in_tasks::columns::task_id.eq(&task.id))
                     .select(schema::subtasks_in_tasks::columns::subtask_id)
                     .order(schema::subtasks_in_tasks::position)
-                    .load::<String>(&*conn);
+                    .load::<String>(&mut *conn);
                 tasks.push(models::Task {
                     id: task.id,
                     database_id: task.database_id,
@@ -77,9 +79,10 @@ async fn create_task(
     json: web::Json<models::Task>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
         .unwrap()
@@ -88,7 +91,7 @@ async fn create_task(
         .clone()
         .unwrap();
 
-    match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
+    match conn.transaction::<Uuid, diesel::result::Error, _>(|conn| {
         let task = json.into_inner();
         let task_id = Uuid::new_v4();
         let new_task = models::QueryableTask {
@@ -101,7 +104,7 @@ async fn create_task(
                 user_id: sub,
                 object_id: task_id.to_string(),
             })
-            .execute(&*conn)?;
+            .execute(conn)?;
 
         for (position, subtask_id) in task.subtasks.iter().enumerate() {
             diesel::insert_into(schema::subtasks_in_tasks::table)
@@ -110,12 +113,12 @@ async fn create_task(
                     task_id: task_id.to_string(),
                     position: position as i32,
                 })
-                .execute(&*conn)?;
+                .execute(conn)?;
         }
 
         diesel::insert_into(schema::tasks::table)
             .values(new_task)
-            .execute(&*conn)?;
+            .execute(conn)?;
 
         Ok(task_id)
     }) {
@@ -132,21 +135,22 @@ async fn get_task(
     id: web::Path<Uuid>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let uuid = id.into_inner();
 
     match schema::tasks::table
         .find(format!("{}", uuid))
-        .get_result::<models::QueryableTask>(&*conn)
+        .get_result::<models::QueryableTask>(&mut *conn)
     {
         Ok(task) => {
             let subtasks_query = schema::subtasks_in_tasks::table
                 .filter(schema::subtasks_in_tasks::columns::task_id.eq(format!("{}", uuid)))
                 .select(schema::subtasks_in_tasks::columns::subtask_id)
                 .order(schema::subtasks_in_tasks::position)
-                .load::<String>(&*conn);
+                .load::<String>(&mut *conn);
 
             HttpResponse::Ok().json(models::Task {
                 id: task.id,
@@ -170,23 +174,24 @@ async fn update_task(
     json: web::Json<models::Task>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let uuid = id.into_inner();
 
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
+    match conn.transaction::<(), diesel::result::Error, _>(|conn| {
         let task = json.into_inner();
 
         diesel::update(schema::tasks::table.find(format!("{}", uuid)))
             .set(models::QueryableTask::from_task(task.clone()))
-            .execute(&*conn)?;
+            .execute(conn)?;
 
         diesel::delete(
             schema::subtasks_in_tasks::table
                 .filter(schema::subtasks_in_tasks::task_id.eq(task.id.clone())),
         )
-        .execute(&*conn)?;
+        .execute(conn)?;
         let mut pos = -1;
         let task_id = task.id.clone();
         let subtasks_in_task: Vec<models::SubtasksInTask> = task
@@ -204,7 +209,7 @@ async fn update_task(
         for subtask in subtasks_in_task {
             diesel::insert_into(schema::subtasks_in_tasks::table)
                 .values(subtask)
-                .execute(&*conn)?;
+                .execute(conn)?;
         }
         Ok(())
     }) {
@@ -221,27 +226,28 @@ async fn delete_task(
     id: web::Path<Uuid>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let uuid = id.into_inner();
 
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
+    match conn.transaction::<(), diesel::result::Error, _>(|conn| {
         diesel::delete(
             schema::subtasks_in_tasks::table
                 .filter(schema::subtasks_in_tasks::task_id.eq(uuid.to_string())),
         )
-        .execute(&*conn)?;
+        .execute(conn)?;
         diesel::delete(
             schema::tasks_in_worksheets::table
                 .filter(schema::tasks_in_worksheets::task_id.eq(uuid.to_string())),
         )
-        .execute(&*conn)?;
+        .execute(conn)?;
         diesel::delete(
             schema::access::table.filter(schema::access::object_id.eq(uuid.to_string())),
         )
-        .execute(&*conn)?;
-        diesel::delete(schema::tasks::table.find(format!("{}", uuid))).execute(&*conn)?;
+        .execute(conn)?;
+        diesel::delete(schema::tasks::table.find(format!("{}", uuid))).execute(conn)?;
         Ok(())
     }) {
         Ok(_) => HttpResponse::Ok().finish(),

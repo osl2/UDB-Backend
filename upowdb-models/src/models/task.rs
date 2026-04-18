@@ -14,7 +14,7 @@ pub struct Task {
 }
 
 #[derive(Debug, Queryable, Insertable, AsChangeset)]
-#[table_name = "tasks"]
+#[diesel(table_name = tasks)]
 pub struct QueryableTask {
     pub id: String,
     pub database_id: String,

@@ -8,6 +8,7 @@ use diesel::{
     r2d2::{self, ConnectionManager},
     SqliteConnection,
 };
+use std::cell::RefCell;
 use uuid::Uuid;
 
 pub fn get_scope() -> Scope {
@@ -27,9 +28,10 @@ pub fn get_scope() -> Scope {
 
 async fn get_courses(req: HttpRequest) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let current_user = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
         .unwrap()
@@ -49,7 +51,7 @@ async fn get_courses(req: HttpRequest) -> impl Responder {
             schema::courses::columns::name,
             schema::courses::columns::description,
         ))
-        .load::<models::QueryableCourse>(&*conn);
+        .load::<models::QueryableCourse>(&mut *conn);
 
     match query {
         Ok(query_courses) => {
@@ -59,7 +61,7 @@ async fn get_courses(req: HttpRequest) -> impl Responder {
                     .filter(schema::worksheets_in_courses::columns::course_id.eq(&course.id))
                     .select(schema::worksheets_in_courses::columns::worksheet_id)
                     .order(schema::worksheets_in_courses::position)
-                    .load::<String>(&*conn);
+                    .load::<String>(&mut *conn);
                 courses.push(models::Course {
                     id: course.id,
                     name: course.name,
@@ -81,9 +83,10 @@ async fn create_course(
     json: web::Json<models::Course>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
         .unwrap()
@@ -92,7 +95,7 @@ async fn create_course(
         .clone()
         .unwrap();
 
-    match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
+    match conn.transaction::<Uuid, diesel::result::Error, _>(|conn| {
         let course = json.into_inner();
         let course_id = Uuid::new_v4();
         let new_course = models::QueryableCourse {
@@ -106,7 +109,7 @@ async fn create_course(
                 user_id: sub,
                 object_id: course_id.to_string(),
             })
-            .execute(&*conn)?;
+            .execute(conn)?;
 
         for (position, worksheet) in course.worksheets.iter().enumerate() {
             diesel::insert_into(schema::worksheets_in_courses::table)
@@ -115,12 +118,12 @@ async fn create_course(
                     course_id: course_id.to_string(),
                     position: position as i32,
                 })
-                .execute(&*conn)?;
+                .execute(conn)?;
         }
 
         diesel::insert_into(schema::courses::table)
             .values(new_course)
-            .execute(&*conn)?;
+            .execute(conn)?;
 
         Ok(course_id)
     }) {
@@ -137,21 +140,22 @@ async fn get_course(
     id: web::Path<Uuid>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let uuid = id.into_inner();
 
     match schema::courses::table
         .find(format!("{}", uuid))
-        .get_result::<models::QueryableCourse>(&*conn)
+        .get_result::<models::QueryableCourse>(&mut *conn)
     {
         Ok(course) => {
             let worksheets_query = schema::worksheets_in_courses::table
                 .filter(schema::worksheets_in_courses::columns::course_id.eq(format!("{}", uuid)))
                 .select(schema::worksheets_in_courses::columns::worksheet_id)
                 .order(schema::worksheets_in_courses::position)
-                .load::<String>(&*conn);
+                .load::<String>(&mut *conn);
 
             HttpResponse::Ok().json(models::Course {
                 id: course.id,
@@ -176,22 +180,23 @@ async fn update_course(
     json: web::Json<models::Course>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
 
     let course = json.into_inner();
     let id_str = format!("{}", id.into_inner());
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
+    match conn.transaction::<(), diesel::result::Error, _>(|conn| {
         diesel::update(schema::courses::table.filter(schema::courses::id.eq(id_str)))
             .set(models::QueryableCourse::from_course(course.clone()))
-            .execute(&*conn)?;
+            .execute(conn)?;
 
         diesel::delete(
             schema::worksheets_in_courses::table
                 .filter(schema::worksheets_in_courses::course_id.eq(course.id.clone())),
         )
-        .execute(&*conn)?;
+        .execute(conn)?;
         let mut pos = -1;
         let course_id = course.id.clone();
         let worksheets_in_course: Vec<WorksheetsInCourse> = course
@@ -209,7 +214,7 @@ async fn update_course(
         for sheet in worksheets_in_course {
             diesel::insert_into(schema::worksheets_in_courses::table)
                 .values(sheet)
-                .execute(&*conn)?;
+                .execute(conn)?;
         }
         Ok(())
     }) {
@@ -226,25 +231,26 @@ async fn delete_course(
     id: web::Path<Uuid>,
 ) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
 
     let uuid = id.into_inner();
 
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
+    match conn.transaction::<(), diesel::result::Error, _>(|conn| {
         diesel::delete(
             schema::access::table.filter(schema::access::object_id.eq(uuid.to_string())),
         )
-        .execute(&*conn)?;
+        .execute(conn)?;
 
         diesel::delete(
             schema::worksheets_in_courses::table
                 .filter(schema::worksheets_in_courses::course_id.eq(uuid.to_string())),
         )
-        .execute(&*conn)?;
+        .execute(conn)?;
 
-        diesel::delete(schema::courses::table.find(format!("{}", uuid))).execute(&*conn)?;
+        diesel::delete(schema::courses::table.find(format!("{}", uuid))).execute(conn)?;
         Ok(())
     }) {
         Ok(_) => HttpResponse::Ok().finish(),

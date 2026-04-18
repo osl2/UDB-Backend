@@ -9,7 +9,7 @@ use std::{future::{ready, Ready}, rc::Rc};
 
 pub struct DatabaseConnection<C: 'static>
 where
-    C: diesel::Connection,
+    C: diesel::Connection + diesel::r2d2::R2D2Connection,
 {
     pub pool: r2d2::Pool<ConnectionManager<C>>,
 }
@@ -19,7 +19,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
-    C: diesel::Connection + 'static,
+    C: diesel::Connection + diesel::r2d2::R2D2Connection + 'static,
 {
     type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
@@ -37,7 +37,7 @@ where
 
 pub struct DatabaseConnectionMiddleware<C: 'static, S>
 where
-    C: diesel::Connection,
+    C: diesel::Connection + diesel::r2d2::R2D2Connection,
 {
     service: Rc<S>,
     pool: r2d2::Pool<ConnectionManager<C>>,
@@ -48,7 +48,7 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
-    C: diesel::Connection + 'static,
+    C: diesel::Connection + diesel::r2d2::R2D2Connection + 'static,
 {
     type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
@@ -65,7 +65,7 @@ where
                 i += 1;
                 match pool.get() {
                     Ok(pooled_conn) => {
-                        req.extensions_mut().insert(pooled_conn);
+                        req.extensions_mut().insert(std::cell::RefCell::new(pooled_conn));
                         return svc.call(req).await.map(|res| res.map_into_left_body());
                     }
                     Err(e) => {

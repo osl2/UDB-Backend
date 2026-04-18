@@ -2,26 +2,21 @@ use crate::models::Content;
 use crate::schema::subtasks;
 use diesel::backend;
 use diesel::deserialize;
-
 use diesel::serialize;
 use diesel::sql_types::Integer;
+use diesel::sqlite::Sqlite;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, FromSqlRow, Serialize, Deserialize, AsExpression)]
-#[sql_type = "Integer"]
+#[diesel(sql_type = Integer)]
 pub enum AllowedSQL {
     ALL = 0,
     QUERY = 1,
 }
 
-impl<DB> deserialize::FromSql<Integer, DB> for AllowedSQL
-where
-    DB: backend::Backend,
-    i32: deserialize::FromSql<Integer, DB>,
-{
-    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
+impl deserialize::FromSql<Integer, Sqlite> for AllowedSQL {
+    fn from_sql(bytes: backend::RawValue<'_, Sqlite>) -> deserialize::Result<Self> {
         match i32::from_sql(bytes)? {
             0 => Ok(AllowedSQL::ALL),
             1 => Ok(AllowedSQL::QUERY),
@@ -30,13 +25,10 @@ where
     }
 }
 
-impl<DB> serialize::ToSql<Integer, DB> for AllowedSQL
-where
-    DB: backend::Backend,
-    i32: serialize::ToSql<Integer, DB>,
-{
-    fn to_sql<W: Write>(&self, out: &mut serialize::Output<W, DB>) -> serialize::Result {
-        (*self as i32).to_sql(out)
+impl serialize::ToSql<Integer, Sqlite> for AllowedSQL {
+    fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
+        out.set_value(diesel::sqlite::SqliteBindValue::from(*self as i32));
+        Ok(serialize::IsNull::No)
     }
 }
 

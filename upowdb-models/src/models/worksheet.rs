@@ -18,7 +18,7 @@ pub struct Worksheet {
 }
 
 #[derive(Queryable, Insertable, AsChangeset)]
-#[table_name = "worksheets"]
+#[diesel(table_name = worksheets)]
 pub struct QueryableWorksheet {
     pub id: String,
     pub name: Option<String>,
