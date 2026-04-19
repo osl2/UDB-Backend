@@ -15,9 +15,10 @@ pub struct Settings {
 
 impl Settings {
     pub fn new(config_file_path: &str) -> Result<Self, ConfigError> {
-        let mut s = Config::new();
-        s.merge(File::with_name(config_file_path))?;
-        s.merge(Environment::with_prefix("udb"))?;
-        s.try_into()
+        Config::builder()
+            .add_source(File::with_name(config_file_path))
+            .add_source(Environment::with_prefix("udb"))
+            .build()?
+            .try_deserialize()
     }
 }

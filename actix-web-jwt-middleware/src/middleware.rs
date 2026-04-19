@@ -1,17 +1,25 @@
 use crate::JwtKey;
 use actix_web::{
-    dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    body::EitherBody,
+    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage,
     http::Method,
 };
-use chrono::{TimeZone, Utc};
-use futures::{
-    future::{ok, Either, FutureResult},
-    Poll,
-};
+use futures_util::future::LocalBoxFuture;
+use jsonwebtoken::{decode, DecodingKey, Validation};
+pub use jsonwebtoken::Algorithm;
 use lazy_static::lazy_static;
 use regex::Regex;
-pub use frank_jwt::Algorithm;
+use serde::{Deserialize, Serialize};
+use std::{future::{ready, Ready}, rc::Rc};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TokenClaims {
+    sub: Option<String>,
+    exp: Option<i64>,
+    #[serde(flatten)]
+    extra: std::collections::HashMap<String, serde_json::Value>,
+}
 
 /// JWT based authentication middleware for actix-web
 #[derive(Clone)]
@@ -24,26 +32,25 @@ pub struct JwtAuthentication {
     pub except: Vec<(Regex, Vec<Method>)>,
 }
 
-impl<S, B> Transform<S> for JwtAuthentication
+impl<S, B> Transform<S, ServiceRequest> for JwtAuthentication
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
     type InitError = ();
     type Transform = JwtAuthenticationMiddleware<S>;
-    type Future = FutureResult<Self::Transform, Self::InitError>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(JwtAuthenticationMiddleware {
+        ready(Ok(JwtAuthenticationMiddleware {
             key: self.key.clone(),
             algorithm: self.algorithm,
             except: self.except.clone(),
-            service: service,
-        })
+            service: Rc::new(service),
+        }))
     }
 }
 
@@ -51,91 +58,102 @@ pub struct JwtAuthenticationMiddleware<S> {
     key: JwtKey,
     algorithm: Algorithm,
     except: Vec<(Regex, Vec<Method>)>,
-    service: S,
+    service: Rc<S>,
 }
 
-impl<S, B> Service for JwtAuthenticationMiddleware<S>
+impl<S, B> Service<ServiceRequest> for JwtAuthenticationMiddleware<S>
 where
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
 {
-    type Request = ServiceRequest;
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = Error;
-    type Future = futures::future::Either<FutureResult<Self::Response, Self::Error>, S::Future>;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.service.poll_ready()
-    }
+    forward_ready!(service);
 
-    fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        for (reg, methods) in self.except.clone() {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        for (reg, methods) in &self.except {
             if reg.is_match(req.path()) && methods.contains(req.method()) {
-                return Either::B(self.service.call(req));
+                let fut = self.service.call(req);
+                return Box::pin(async move {
+                    fut.await.map(|res| res.map_into_left_body())
+                });
             }
         }
+
         let token = match get_token(&req) {
             Ok(token) => token,
             Err(error) => {
                 log::debug!("Could not extract token from request: {}", error);
-                return Either::A(ok(req.into_response(
-                    actix_web::HttpResponse::Unauthorized().finish().into_body(),
-                )));
+                return Box::pin(async move {
+                    Ok(req.into_response(
+                        actix_web::HttpResponse::Unauthorized().finish(),
+                    ).map_into_right_body())
+                });
             }
         };
 
-        match dbg!(match &self.key {
-            JwtKey::Inline(key) => frank_jwt::decode(&token, key, self.algorithm),
-            JwtKey::File(key) => frank_jwt::decode(&token, key, self.algorithm),
-        }) {
-            Ok((header, claims)) => {
-                //TODO: frank_jwt does not validate things yet,
-                //we should either validate things here or patch frank_jwt
+        let key_str = match &self.key {
+            JwtKey::Inline(key) => key.clone(),
+            JwtKey::File(path) => match std::fs::read_to_string(path) {
+                Ok(content) => content,
+                Err(e) => {
+                    log::error!("Couldn't read JWT key file: {}", e);
+                    return Box::pin(async move {
+                        Ok(req.into_response(
+                            actix_web::HttpResponse::InternalServerError().finish(),
+                        ).map_into_right_body())
+                    });
+                }
+            },
+        };
+
+        let algorithm = self.algorithm;
+        let mut validation = Validation::new(algorithm);
+        validation.validate_exp = false;
+
+        match decode::<serde_json::Value>(&token, &DecodingKey::from_secret(key_str.as_bytes()), &validation) {
+            Ok(token_data) => {
+                let claims_value = token_data.claims;
+                let sub = match &claims_value {
+                    serde_json::Value::Object(map) => match map.get("sub") {
+                        Some(serde_json::Value::String(s)) => Some(s.clone()),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                let exp = match &claims_value {
+                    serde_json::Value::Object(map) => match map.get("exp") {
+                        Some(serde_json::Value::Number(n)) => n.as_i64(),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+
                 let auth_data = crate::AuthenticationData {
-                    header: header,
+                    header: serde_json::Value::Object(serde_json::Map::new()),
                     claims: crate::Claims {
-                        all: claims.clone(),
-                        sub: match claims.clone() {
-                            serde_json::Value::Object(map) => match map.get("sub") {
-                                Some(sub) => match sub {
-                                    serde_json::Value::String(sub) => Some(sub.to_owned()),
-                                    _ => None,
-                                },
-                                _ => None,
-                            },
-                            _ => None,
-                        },
-                        exp: match claims {
-                            serde_json::Value::Object(map) => match map.get("exp") {
-                                Some(exp) => match exp {
-                                    serde_json::Value::Number(exp) => exp.as_i64(),
-                                    _ => None,
-                                },
-                                _ => None,
-                            },
-                            _ => None,
-                        },
+                        all: claims_value,
+                        sub,
+                        exp,
                     },
                 };
-                match auth_data.claims.exp {
-                    Some(exp) => {
-                        if Utc.timestamp(exp, 0) > Utc::now() {
-                            return Either::A(ok(req.into_response(
-                                actix_web::HttpResponse::Unauthorized().finish().into_body(),
-                            )));
-                        }
-                    }
-                    _ => (),
-                }
+
                 req.extensions_mut().insert(auth_data);
-                Either::B(self.service.call(req))
+                let svc = self.service.clone();
+                Box::pin(async move {
+                    svc.call(req).await.map(|res| res.map_into_left_body())
+                })
             }
             Err(error) => {
                 log::debug!("Could not decode token: {}", error);
-                Either::A(ok(req.into_response(
-                    actix_web::HttpResponse::Unauthorized().finish().into_body(),
-                )))
+                Box::pin(async move {
+                    Ok(req.into_response(
+                        actix_web::HttpResponse::Unauthorized().finish(),
+                    ).map_into_right_body())
+                })
             }
         }
     }

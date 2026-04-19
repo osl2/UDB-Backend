@@ -1,34 +1,37 @@
 use crate::models;
 use crate::models::TasksInWorksheet;
 use crate::schema;
-use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
+use actix_web::{web, HttpRequest, HttpResponse, Responder, Scope};
+use actix_web::HttpMessage;
 use diesel::{
     prelude::*,
     r2d2::{self, ConnectionManager},
+    SqliteConnection,
 };
-use futures::future::{Future, IntoFuture};
+use std::cell::RefCell;
 use uuid::Uuid;
 
 pub fn get_scope() -> Scope {
     web::scope("/worksheets")
         .service(
             web::resource("")
-                .route(web::get().to_async(get_worksheets))
-                .route(web::post().to_async(create_worksheet)),
+                .route(web::get().to(get_worksheets))
+                .route(web::post().to(create_worksheet)),
         )
         .service(
             web::resource("/{id}")
-                .route(web::get().to_async(get_worksheet))
-                .route(web::put().to_async(update_worksheet))
-                .route(web::delete().to_async(delete_worksheet)),
+                .route(web::get().to(get_worksheet))
+                .route(web::put().to(update_worksheet))
+                .route(web::delete().to(delete_worksheet)),
         )
 }
 
-fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+async fn get_worksheets(req: HttpRequest) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
         .unwrap()
@@ -37,7 +40,7 @@ fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error
         .clone()
         .unwrap();
 
-    match conn.transaction::<Vec<models::Worksheet>, diesel::result::Error, _>(|| {
+    match conn.transaction::<Vec<models::Worksheet>, diesel::result::Error, _>(|conn| {
         let mut worksheets: Vec<models::Worksheet> = Vec::new();
         let query_worksheets = schema::worksheets::table
             .inner_join(
@@ -51,13 +54,13 @@ fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error
                 schema::worksheets::columns::is_online,
                 schema::worksheets::columns::is_solution_online,
             ))
-            .load::<models::QueryableWorksheet>(&*conn)?;
+            .load::<models::QueryableWorksheet>(conn)?;
         for worksheet in query_worksheets {
             let tasks_query = schema::tasks_in_worksheets::table
                 .filter(schema::tasks_in_worksheets::columns::worksheet_id.eq(&worksheet.id))
                 .select(schema::tasks_in_worksheets::columns::task_id)
                 .order(schema::tasks_in_worksheets::position)
-                .load::<String>(&*conn);
+                .load::<String>(conn);
             worksheets.push(models::Worksheet {
                 id: worksheet.id,
                 name: worksheet.name,
@@ -68,22 +71,23 @@ fn get_worksheets(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error
         }
         Ok(worksheets)
     }) {
-        Ok(result) => Box::new(Ok(HttpResponse::Ok().json(result)).into_future()),
+        Ok(result) => HttpResponse::Ok().json(result),
         Err(e) => {
             log::error!("Couldn't load worksheet: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-fn create_worksheet(
+async fn create_worksheet(
     req: HttpRequest,
     json: web::Json<models::Worksheet>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
         .unwrap()
@@ -92,8 +96,7 @@ fn create_worksheet(
         .clone()
         .unwrap();
 
-    match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
-        // create worksheet object
+    match conn.transaction::<Uuid, diesel::result::Error, _>(|conn| {
         let worksheet = json.into_inner();
         let worksheet_id = Uuid::new_v4();
         let new_worksheet = models::QueryableWorksheet {
@@ -103,15 +106,13 @@ fn create_worksheet(
             is_solution_online: worksheet.is_solution_online,
         };
 
-        // insert access for user
         diesel::insert_into(schema::access::table)
             .values(models::Access {
                 user_id: sub,
                 object_id: worksheet_id.to_string(),
             })
-            .execute(&*conn)?;
+            .execute(conn)?;
 
-        // set tasks belonging to worksheet
         for (position, task_id) in worksheet.tasks.iter().enumerate() {
             diesel::insert_into(schema::tasks_in_worksheets::table)
                 .values(models::TasksInWorksheet {
@@ -119,43 +120,44 @@ fn create_worksheet(
                     worksheet_id: worksheet_id.to_string(),
                     position: position as i32,
                 })
-                .execute(&*conn)?;
+                .execute(conn)?;
         }
 
-        // insert worksheet object
         diesel::insert_into(schema::worksheets::table)
             .values(new_worksheet)
-            .execute(&*conn)?;
+            .execute(conn)?;
 
         Ok(worksheet_id)
     }) {
-        Ok(id) => Box::new(Ok(HttpResponse::Ok().body(id.to_string())).into_future()),
+        Ok(id) => HttpResponse::Ok().body(id.to_string()),
         Err(e) => {
             log::error!("Couldn't create worksheet: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-fn get_worksheet(
+async fn get_worksheet(
     req: HttpRequest,
     id: web::Path<Uuid>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
+    let uuid = id.into_inner();
 
-    match conn.transaction::<models::Worksheet, diesel::result::Error, _>(|| {
+    match conn.transaction::<models::Worksheet, diesel::result::Error, _>(|conn| {
         let worksheet = schema::worksheets::table
-            .find(format!("{}", id))
-            .get_result::<models::QueryableWorksheet>(&*conn)?;
+            .find(format!("{}", uuid))
+            .get_result::<models::QueryableWorksheet>(conn)?;
 
         let tasks_query = schema::tasks_in_worksheets::table
-            .filter(schema::tasks_in_worksheets::columns::worksheet_id.eq(format!("{}", id)))
+            .filter(schema::tasks_in_worksheets::columns::worksheet_id.eq(format!("{}", uuid)))
             .select(schema::tasks_in_worksheets::columns::task_id)
             .order(schema::tasks_in_worksheets::position)
-            .load::<String>(&*conn);
+            .load::<String>(conn);
 
         Ok(models::Worksheet {
             id: worksheet.id,
@@ -165,45 +167,41 @@ fn get_worksheet(
             tasks: tasks_query.unwrap(),
         })
     }) {
-        Ok(sheet) => Box::new(Ok(HttpResponse::Ok().json(sheet)).into_future()),
+        Ok(sheet) => HttpResponse::Ok().json(sheet),
         Err(e) => match e {
-            diesel::result::Error::NotFound => {
-                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
-            }
+            diesel::result::Error::NotFound => HttpResponse::NotFound().finish(),
             e => {
                 log::error!("{}", e);
-                Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+                HttpResponse::InternalServerError().finish()
             }
         },
     }
 }
 
-fn update_worksheet(
+async fn update_worksheet(
     req: HttpRequest,
     id: web::Path<Uuid>,
     json: web::Json<models::Worksheet>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
+    let uuid = id.into_inner();
 
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
+    match conn.transaction::<(), diesel::result::Error, _>(|conn| {
         let worksheet = json.into_inner();
 
-        // update worksheet
-        diesel::update(schema::worksheets::table.find(format!("{}", id)))
-            .set(models::QueryableWorksheet::from_worksheet(
-                worksheet.clone(),
-            ))
-            .execute(&*conn)?;
+        diesel::update(schema::worksheets::table.find(format!("{}", uuid)))
+            .set(models::QueryableWorksheet::from_worksheet(worksheet.clone()))
+            .execute(conn)?;
 
-        // update which tasks belong to worksheet
         diesel::delete(
             schema::tasks_in_worksheets::table
                 .filter(schema::tasks_in_worksheets::worksheet_id.eq(worksheet.id.clone())),
         )
-        .execute(&*conn)?;
+        .execute(conn)?;
         let mut pos = -1;
         let worksheet_id = worksheet.id.clone();
         let tasks_in_worksheet: Vec<TasksInWorksheet> = worksheet
@@ -222,41 +220,42 @@ fn update_worksheet(
         for task in tasks_in_worksheet {
             diesel::insert_into(schema::tasks_in_worksheets::table)
                 .values(task)
-                .execute(&*conn)?;
+                .execute(conn)?;
         }
         Ok(())
     }) {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             log::error!("Couldn't update worksheet: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-fn delete_worksheet(
+async fn delete_worksheet(
     req: HttpRequest,
     id: web::Path<Uuid>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
+    let uuid = id.into_inner();
 
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
-        let uuid = id.into_inner();
+    match conn.transaction::<(), diesel::result::Error, _>(|conn| {
         diesel::delete(
             schema::tasks_in_worksheets::table
                 .filter(schema::tasks_in_worksheets::worksheet_id.eq(uuid.to_string())),
         )
-        .execute(&*conn)?;
-        diesel::delete(schema::worksheets::table.find(format!("{}", uuid))).execute(&*conn)?;
+        .execute(conn)?;
+        diesel::delete(schema::worksheets::table.find(format!("{}", uuid))).execute(conn)?;
         Ok(())
     }) {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             log::error!("Couldn't delete worksheet: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }

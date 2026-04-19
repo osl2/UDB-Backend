@@ -1,15 +1,13 @@
 use crate::models::{MCSolution, PlaintextSolution, SQLSolution, Solution, AllowedSQL};
-use diesel::backend::Backend;
 use diesel::deserialize::FromSql;
 use diesel::serialize::{IsNull, Output, ToSql};
 use diesel::sql_types::Text;
+use diesel::sqlite::Sqlite;
 use diesel::{deserialize, serialize};
 use serde::{Deserialize, Serialize};
-use std::error::Error;
-use std::io::Write;
 
 #[derive(Debug, Serialize, Deserialize, FromSqlRow, AsExpression)]
-#[sql_type = "Text"]
+#[diesel(sql_type = Text)]
 pub enum Content {
     #[serde(rename = "sql")]
     SQL {
@@ -53,15 +51,9 @@ impl Content {
     }
 }
 
-//special to and from sql traits because content gets saved as json
-
-impl<DB> FromSql<Text, DB> for Content
-where
-    DB: Backend,
-    String: FromSql<Text, DB>,
-{
-    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
-        match String::from_sql(bytes) {
+impl FromSql<Text, Sqlite> for Content {
+    fn from_sql(bytes: <Sqlite as diesel::backend::Backend>::RawValue<'_>) -> deserialize::Result<Self> {
+        match <String as FromSql<Text, Sqlite>>::from_sql(bytes) {
             Ok(json) => match serde_json::from_str(&json) {
                 Ok(content) => Ok(content),
                 Err(x) => Err(Box::new(x)),
@@ -71,17 +63,13 @@ where
     }
 }
 
-impl<DB> ToSql<Text, DB> for Content
-where
-    DB: Backend,
-    String: FromSql<Text, DB>,
-{
-    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+impl ToSql<Text, Sqlite> for Content {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Sqlite>) -> serialize::Result {
         match serde_json::to_string(self) {
-            Ok(json) => out
-                .write_fmt(format_args!("{}", json))
-                .map(|_| IsNull::No)
-                .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>),
+            Ok(json) => {
+                out.set_value(diesel::sqlite::SqliteBindValue::from(json));
+                Ok(IsNull::No)
+            }
             Err(e) => Err(Box::new(e)),
         }
     }

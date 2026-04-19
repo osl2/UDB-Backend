@@ -1,35 +1,37 @@
 use crate::models;
 use crate::models::WorksheetsInCourse;
 use crate::schema;
-use actix_web::{web, Error, HttpRequest, HttpResponse, Scope};
+use actix_web::{web, HttpRequest, HttpResponse, Responder, Scope};
+use actix_web::HttpMessage;
 use diesel::{
     prelude::*,
     r2d2::{self, ConnectionManager},
     SqliteConnection,
 };
-use futures::future::{Future, IntoFuture};
+use std::cell::RefCell;
 use uuid::Uuid;
 
 pub fn get_scope() -> Scope {
     web::scope("/courses")
         .service(
             web::resource("")
-                .route(web::get().to_async(get_courses))
-                .route(web::post().to_async(create_course)),
+                .route(web::get().to(get_courses))
+                .route(web::post().to(create_course)),
         )
         .service(
             web::resource("/{id}")
-                .route(web::get().to_async(get_course))
-                .route(web::put().to_async(update_course))
-                .route(web::delete().to_async(delete_course)),
+                .route(web::get().to(get_course))
+                .route(web::put().to(update_course))
+                .route(web::delete().to(delete_course)),
         )
 }
 
-fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+async fn get_courses(req: HttpRequest) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let current_user = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
         .unwrap()
@@ -49,7 +51,7 @@ fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
             schema::courses::columns::name,
             schema::courses::columns::description,
         ))
-        .load::<models::QueryableCourse>(&*conn);
+        .load::<models::QueryableCourse>(&mut *conn);
 
     match query {
         Ok(query_courses) => {
@@ -59,7 +61,7 @@ fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
                     .filter(schema::worksheets_in_courses::columns::course_id.eq(&course.id))
                     .select(schema::worksheets_in_courses::columns::worksheet_id)
                     .order(schema::worksheets_in_courses::position)
-                    .load::<String>(&*conn);
+                    .load::<String>(&mut *conn);
                 courses.push(models::Course {
                     id: course.id,
                     name: course.name,
@@ -67,23 +69,24 @@ fn get_courses(req: HttpRequest) -> Box<dyn Future<Item = HttpResponse, Error = 
                     worksheets: worksheets_query.unwrap(),
                 });
             }
-            Box::new(Ok(HttpResponse::Ok().json(courses)).into_future())
+            HttpResponse::Ok().json(courses)
         }
         Err(e) => {
             log::error!("Couldn't get courses: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-fn create_course(
+async fn create_course(
     req: HttpRequest,
     json: web::Json<models::Course>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
     let sub = extensions
         .get::<actix_web_jwt_middleware::AuthenticationData>()
         .unwrap()
@@ -92,8 +95,7 @@ fn create_course(
         .clone()
         .unwrap();
 
-    match conn.transaction::<Uuid, diesel::result::Error, _>(|| {
-        // create course object
+    match conn.transaction::<Uuid, diesel::result::Error, _>(|conn| {
         let course = json.into_inner();
         let course_id = Uuid::new_v4();
         let new_course = models::QueryableCourse {
@@ -102,15 +104,13 @@ fn create_course(
             description: course.description,
         };
 
-        // insert access for user
         diesel::insert_into(schema::access::table)
             .values(models::Access {
                 user_id: sub,
                 object_id: course_id.to_string(),
             })
-            .execute(&*conn)?;
+            .execute(conn)?;
 
-        // set worksheets belonging to course
         for (position, worksheet) in course.worksheets.iter().enumerate() {
             diesel::insert_into(schema::worksheets_in_courses::table)
                 .values(models::WorksheetsInCourse {
@@ -118,92 +118,85 @@ fn create_course(
                     course_id: course_id.to_string(),
                     position: position as i32,
                 })
-                .execute(&*conn)?;
+                .execute(conn)?;
         }
 
-        // insert course object
         diesel::insert_into(schema::courses::table)
             .values(new_course)
-            .execute(&*conn)?;
+            .execute(conn)?;
 
         Ok(course_id)
     }) {
-        Ok(course_id) => Box::new(Ok(HttpResponse::Ok().body(course_id.to_string())).into_future()),
+        Ok(course_id) => HttpResponse::Ok().body(course_id.to_string()),
         Err(e) => {
             log::error!("Could not create course: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-fn get_course(
+async fn get_course(
     req: HttpRequest,
     id: web::Path<Uuid>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
+    let uuid = id.into_inner();
 
     match schema::courses::table
-        .find(format!("{}", id))
-        .get_result::<models::QueryableCourse>(&*conn)
+        .find(format!("{}", uuid))
+        .get_result::<models::QueryableCourse>(&mut *conn)
     {
         Ok(course) => {
             let worksheets_query = schema::worksheets_in_courses::table
-                .filter(schema::worksheets_in_courses::columns::course_id.eq(format!("{}", id)))
+                .filter(schema::worksheets_in_courses::columns::course_id.eq(format!("{}", uuid)))
                 .select(schema::worksheets_in_courses::columns::worksheet_id)
                 .order(schema::worksheets_in_courses::position)
-                .load::<String>(&*conn);
+                .load::<String>(&mut *conn);
 
-            Box::new(
-                Ok(HttpResponse::Ok().json(models::Course {
-                    id: course.id,
-                    name: course.name,
-                    description: course.description,
-                    worksheets: worksheets_query.unwrap(),
-                }))
-                .into_future(),
-            )
+            HttpResponse::Ok().json(models::Course {
+                id: course.id,
+                name: course.name,
+                description: course.description,
+                worksheets: worksheets_query.unwrap(),
+            })
         }
         Err(e) => match e {
-            diesel::result::Error::NotFound => {
-                Box::new(Ok(HttpResponse::NotFound().finish()).into_future())
-            }
+            diesel::result::Error::NotFound => HttpResponse::NotFound().finish(),
             e => {
                 log::error!("Couldn't get course: {}", e);
-                Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+                HttpResponse::InternalServerError().finish()
             }
         },
     }
 }
 
-fn update_course(
+async fn update_course(
     req: HttpRequest,
     id: web::Path<Uuid>,
     json: web::Json<models::Course>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
 
     let course = json.into_inner();
-    let id = format!("{}", id.into_inner());
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
-        // update course
-        diesel::update(schema::courses::table.filter(schema::courses::id.eq(id)))
+    let id_str = format!("{}", id.into_inner());
+    match conn.transaction::<(), diesel::result::Error, _>(|conn| {
+        diesel::update(schema::courses::table.filter(schema::courses::id.eq(id_str)))
             .set(models::QueryableCourse::from_course(course.clone()))
-            .execute(&*conn)?;
+            .execute(conn)?;
 
-        // update which worksheets belong to course
-        // first delete old ones
         diesel::delete(
             schema::worksheets_in_courses::table
                 .filter(schema::worksheets_in_courses::course_id.eq(course.id.clone())),
         )
-        .execute(&*conn)?;
-        // then list new ones
+        .execute(conn)?;
         let mut pos = -1;
         let course_id = course.id.clone();
         let worksheets_in_course: Vec<WorksheetsInCourse> = course
@@ -218,52 +211,52 @@ fn update_course(
                 }
             })
             .collect();
-        // finally insert them into the table
         for sheet in worksheets_in_course {
             diesel::insert_into(schema::worksheets_in_courses::table)
                 .values(sheet)
-                .execute(&*conn)?;
+                .execute(conn)?;
         }
         Ok(())
     }) {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             log::error!("Couldn't update course: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
 
-fn delete_course(
+async fn delete_course(
     req: HttpRequest,
     id: web::Path<Uuid>,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Responder {
     let extensions = req.extensions();
-    let conn = extensions
-        .get::<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>()
+    let conn_cell = extensions
+        .get::<RefCell<r2d2::PooledConnection<ConnectionManager<SqliteConnection>>>>()
         .unwrap();
+    let mut conn = conn_cell.borrow_mut();
 
     let uuid = id.into_inner();
 
-    match conn.transaction::<(), diesel::result::Error, _>(|| {
+    match conn.transaction::<(), diesel::result::Error, _>(|conn| {
         diesel::delete(
             schema::access::table.filter(schema::access::object_id.eq(uuid.to_string())),
         )
-        .execute(&*conn)?;
+        .execute(conn)?;
 
         diesel::delete(
             schema::worksheets_in_courses::table
                 .filter(schema::worksheets_in_courses::course_id.eq(uuid.to_string())),
         )
-        .execute(&*conn)?;
+        .execute(conn)?;
 
-        diesel::delete(schema::courses::table.find(format!("{}", uuid))).execute(&*conn)?;
+        diesel::delete(schema::courses::table.find(format!("{}", uuid))).execute(conn)?;
         Ok(())
     }) {
-        Ok(_) => Box::new(Ok(HttpResponse::Ok().finish()).into_future()),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             log::error!("Couldn't delete course: {}", e);
-            Box::new(Ok(HttpResponse::InternalServerError().finish()).into_future())
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
