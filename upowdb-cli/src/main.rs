@@ -1,13 +1,13 @@
 use upowdb_models::models;
 
-fn main() -> Result<(), Box<std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let username = "elite_admin";
     let password = "2342";
 
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(reqwest::header::ORIGIN, reqwest::header::HeaderValue::from_str("https://staging.upowdb.xyz")?);
 
-    let client = reqwest::Client::builder().default_headers(headers.clone()).build()?;
+    let client = reqwest::blocking::Client::builder().default_headers(headers.clone()).build()?;
 
     dbg!(client.post("https://api.staging.upowdb.xyz/api/v1/account/register")
     .json(&models::Account {username: username.to_string(), password: password.to_string()}).send()?);
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
         .basic_auth(username, Some(password)).send()?.text()?))?;
     let token = token["token"].as_str().unwrap();
     headers.insert(reqwest::header::AUTHORIZATION, reqwest::header::HeaderValue::from_str(&format!("Bearer {}", dbg!(token)))?);
-    let client = reqwest::Client::builder().default_headers(headers).build()?;
+    let client = reqwest::blocking::Client::builder().default_headers(headers).build()?;
 
     let sql_subtask = models::Subtask {
         id: "".to_string(),
